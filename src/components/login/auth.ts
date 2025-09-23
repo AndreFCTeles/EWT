@@ -1,4 +1,4 @@
-import { CredentialSafe, DB_HOST } from "./types";
+import { CredentialSafe, DB_HOST } from "@/utils/types";
 
 const login = async(username: string, password: string, appName = 'JRMFerias') => {
    const res = await fetch(`${DB_HOST}/api/auth/login`, {

@@ -8,29 +8,56 @@ import React, {
 } from 'react';
 import { 
    AppShell,
-   Button,
-   Stack,
-   Flex,
+   //Button,
+   //Stack,
+   //Flex,
    Modal,
-   Notification
+   Container,
+   //Notification,
+   Transition
 } from '@mantine/core';
-import { notifications } from '@mantine/notifications';
+import { useDisclosure } from '@mantine/hooks';
+//import { notifications } from '@mantine/notifications';
 // Components
-import LoginModal from './components/LoginModal';
-import Process from './components/Process';
+import LoginModal from '@/components/login/LoginModal';
+//import Process from '@/Process';
 // Utils
-import login from './utils/auth';
+import login from '@/components/login/auth';
+import { ChecklistController } from '@/components/checklist/ChecklistController';
+import { Submission } from '@/components/checklist/types';
+import { AdminHUD } from '@/components/admin/AdminHUD';
 // Types
 import { 
    Role,
-   mainComponents, 
-   processComponents,
+   //mainComponents, 
+   //processes,
    CredentialSafe,
    APP_NAME,
    LS_AUTH,
    LS_KEEP
-} from './utils/types';
+} from '@/utils/types';
 
+
+
+const initialSubmission: Submission = {
+   header: { 
+      operator: 'demo', 
+      station: 'S1', 
+      appVer: '0.1.0', 
+      templateVer: '2025-09-19' 
+   },
+   dut: { 
+      model: 'ELECTREX-600', 
+      serial: 'SN-0001', 
+      processes: ['MIG', 'TIG', 'MMA'] 
+   },
+   instruments: { 
+      meterId: 'FLUKE-1', 
+      meterCal: '2025-01-01', 
+      lbId: 'LB-42' 
+   },
+   steps: [],
+};
 
 
 
@@ -43,9 +70,10 @@ const App: React.FC  = () => {
    
    /* |--- STATES ---| */
    // Autenticação e níveis de acesso
-   const [showLoginModal, setShowLoginModal] = useState(true); // ------------------------------- Mostra modal de login
+   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------ Mostra modal de login
    const [isLoggedIn, setIsLoggedIn] = useState(false); // -------------------------------------- Ativa/muda elementos UI após login
    const [authUser, setAuthUser] = useState<CredentialSafe | null>(null); // -------------------- Muda acesso a funcionalidades consoante autorização de login
+   const [role, setRole] = useState<Role>('user');
 // const roleRank: Record<Role, number> = { user: 0, admin: 1, superadmin: 2 }; // -------------- Nível de acesso
    const [authBooting, setAuthBooting] = useState(true); // ------------------------------------- Auto-login
    const [showChangePw, setShowChangePw] = useState(false); // ---------------------------------- Comportamento de modal de mudança de password
@@ -75,10 +103,13 @@ const App: React.FC  = () => {
       setTimeout(() => { setNotification((prevState) => ({ ...prevState, visible: false })); }, 5000);
    }, []);
    // Component management & nav
-   const [currentComponent, setCurrentComponent] = useState<mainComponents | processComponents>('process');
-   const [previousComponent, setPreviousComponent] = useState<mainComponents | processComponents>('process');
+// const [currentComponent, setCurrentComponent] = useState<mainComponents | processes>('process');
+// const [previousComponent, setPreviousComponent] = useState<mainComponents | processes>('process');
+   const [submission, setSubmission] = useState<Submission>(initialSubmission);
+   const [navOpened, { toggle: toggleNav }] = useDisclosure(role==='admin');
 
    // Content
+   /*
    const renderComponent = () => {
       switch (currentComponent) {
          case 'process':
@@ -91,6 +122,7 @@ const App: React.FC  = () => {
             return   <div>Em desenvolvimento</div>;
       }
    };
+   */
 
 
 
@@ -105,7 +137,8 @@ const App: React.FC  = () => {
       setShowLoginModal(false);
    };
    const handleLoginClose = () => { setShowLoginModal(false); } // IMPORTANTE - Separei close de open por causa de bugs com a tecla Esc
-   const handlePersistToggle = useCallback((checked: boolean) => { setPersistLogin(checked); }, []); // passar computed canChangePassword 
+   //const handlePersistToggle = useCallback((checked: boolean) => { setPersistLogin(checked); }, []); // passar computed canChangePassword 
+   /*
    const handleLogout = useCallback(() => {
       setAuthUser(null);
       setIsLoggedIn(false);
@@ -114,6 +147,7 @@ const App: React.FC  = () => {
       localStorage.removeItem(LS_AUTH);
       setShowChangePw(false);
    }, []);
+   */
 
 
 
@@ -156,17 +190,63 @@ const App: React.FC  = () => {
 
    /* |--- JSX / RENDER APP ---| */
    return (
-      <AppShell bg={'blue.1'}>
+      <AppShell 
+      layout="alt"
+      transitionTimingFunction="ease"
+      transitionDuration={500}
+      header={{height: 48}}
+      navbar={{ 
+         width: navOpened ? 320 : 0, 
+         breakpoint: 'sm',
+         collapsed: {
+            mobile: !navOpened, 
+            desktop: !navOpened
+         }
+      }}
+      bg={'blue.1'}
+      >
 
-         <AppShell.Navbar>         
-         </AppShell.Navbar>
+         
+         
+         <Transition 
+         mounted={navOpened} 
+         transition={"scale-x"}
+         duration={500}
+         >
+            {(transitionStyle) => (
+               <AppShell.Navbar p={navOpened ? "sm" : 0} style={{ ...transitionStyle}} >
+                  {/* navOpened && ( <AdminHUD submission={submission} />) */}
+                  <AdminHUD submission={submission} importstyle={transitionStyle} />
+               </AppShell.Navbar>
+            )}
+         </Transition>
+         
 
-         <AppShell.Header>         
+         <AppShell.Header>     
+            <Container size="lg" py={8}>
+               {/* put a role toggle for dev */}
+               <span 
+               style={{ cursor: 'pointer' }} 
+               onClick={() => {
+                  setRole(r => r === 'user' ? 'admin' : 'user')
+                  toggleNav();
+               }}>
+                  Role: <b>{role}</b>
+               </span>
+            </Container>    
          </AppShell.Header>
 
 
          <AppShell.Main>
-            {renderComponent()}
+            {/* renderComponent() */}
+            <Container fluid py="md" mih={"100%"}>
+               <ChecklistController
+               role={role}
+               submission={submission}
+               setSubmission={setSubmission}
+               // you can pass jumpTo for admin here later
+               />
+            </Container>
             
             {!authBooting && showLoginModal && (
                <Modal

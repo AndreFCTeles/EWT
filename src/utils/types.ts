@@ -29,7 +29,5 @@ export type SavedAuth = {
 };
 
 
-
-// COMPONENTS
 export type mainComponents = "process" | "login" | 'wait';
-export type processComponents = "MIG" | "MMA" | "TIG";
+export type Processes = "MIG" | "MMA" | "TIG";

@@ -22,8 +22,8 @@ import {
    LS_SAVED,
    LS_AUTH,
    LS_KEEP
-} from '../utils/types';
-import login from '../utils/auth';
+} from '@/utils/types';
+import login from './auth';
 
 
 // Props

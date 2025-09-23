@@ -23,3 +23,10 @@
    background-color: #228BE6;
    border: #509ee2 solid 5px;
 }
+
+.mantine-Card-root .mantine-Paper-root {
+   height: 100% !important;
+   min-height: 100% !important;
+   width: 100% !important;
+   min-width: 100% !important;
+}
