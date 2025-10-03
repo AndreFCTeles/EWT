@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button, Code, Group } from '@mantine/core';
-import { StepRuntimeProps } from '@/components/checklist/pipeline';
-import { buildReport } from '@/services/report';
+import { StepRuntimeProps } from '@checklist/pipeline';
+import { buildReport } from '@/services/utils/report';
 import { StepShell } from './StepShell';
 
+
+
+
 export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
-   const report = buildReport(submission);
+   const report = useMemo(() => buildReport(submission), [submission]);
    const json = JSON.stringify(report, null, 2);
 
    const download = () => {

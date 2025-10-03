@@ -1,8 +1,66 @@
-import { Processes } from "@/utils/types";
+import { AvailablePowers, Processes } from "@/services/generalTypes";
+import { ProductData } from "@/services/productTypes";
+import type { DeviceOrigin } from "@/services/generalTypes";
+//import type { DutRuntime } from "@/services/utils/dutRuntime";
+
+
+
+export type ProductDoc = {
+   _id?: { $oid: string };
+   prodName: string;
+   brand: string;
+   series?: string;
+   category: {
+      main: string;
+      sub?: {
+         main: string;
+         format?: string;
+         sub?: { main: string };
+      };
+      format?: string;
+   };
+   technical: Array<{ 
+      field: string; 
+      value: string; 
+      suf?: string 
+   }>;
+   applications?: string;
+   description?: string;
+   functions: any[];
+   images: any[];
+   createdDate?: string;
+   updatedDate?: string;
+};
+
+
+export type Dut = {
+   prodName: string;
+   brand: string;
+   series?: string;
+   serialno?: string;
+   processes: Processes[];
+   ratedCurrent?: AvailablePowers; // optional; we’ll fill if we can
+   format?: string;              // derived from category.format or top-level format
+   origin: DeviceOrigin;
+};
+
+/*
+export type DutRuntime = {
+   prodName: string;
+   brand: string;
+   series?: string;
+   processes: Processes[];
+   ratedCurrent?: AvailablePowers;
+   origin: DeviceOrigin;
+};
+*/
+
 
 
 export type StepId =
-   | 'login' | 'dut' | 'specs'
+   | 'login' | 'specs'
+   | 'dut' | 'detectDut'
+   | 'pickProcess' | 'pickPower' | 'pickBrand'
    | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
    | 'ocv'
    | `proc:${Processes}:nominals`
@@ -34,12 +92,16 @@ export type Submission = {
       appVer: string; 
       templateVer: string; 
    };
-   dut: { // device under test
-      model: string; 
-      serial: string; 
-      firmware?: string; 
+   dut: Dut;
+   /*{ // device under test
+      model?: string; 
+      serial?: string; 
+      brand: string;
       processes: Array<Processes>; 
-   };
+      ratedCurrent?: AvailablePowers;
+      firmware?: string; 
+      origin?: DeviceOrigin; 
+   };*/
    instruments: { 
       meterId: string; 
       meterCal: string; 
@@ -51,13 +113,25 @@ export type Submission = {
       mainsV?: number 
    };
    steps: StepRecord[];
+   //vars?: Record<string, any>;
+   vars?: {
+      manualSelect?: boolean;         // set true if auto-detect failed
+      selectedProcess?: Processes;
+      powerA?: AvailablePowers;
+      brand?: string;
+      productData?: ProductData;
+      dutPatchedManual?: boolean;
+      [k: string]: any;
+   };
    finalVerdict?: Verdict;
    reportId?: string;
 };
 
 
 export const PIPELINE: StepId[] = [
-   'login', 'dut', 'specs',
+   'login', 'specs',
+   'dut', 'detectDut', 
+   'pickProcess', 'pickPower', 'pickBrand',
    'interlocks', 'connections', 'selftests', 'calstatus',
    'ocv',
    'proc:MIG:nominals', 'proc:MIG:start', 'proc:MIG:sweep', 'proc:MIG:pulse', 'proc:MIG:thermal', 'proc:MIG:gas',

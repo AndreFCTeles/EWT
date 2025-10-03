@@ -1,4 +1,4 @@
-import { CredentialSafe, DB_HOST } from "@/utils/types";
+import { CredentialSafe, DB_HOST } from "@/services/generalTypes";
 
 const login = async(username: string, password: string, appName = 'JRMFerias') => {
    const res = await fetch(`${DB_HOST}/api/auth/login`, {
@@ -6,6 +6,8 @@ const login = async(username: string, password: string, appName = 'JRMFerias') =
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, appName }),
    });
+   console.log("got login response");
+   console.log(res);
    const json = await res.json();
    if (!res.ok) { throw new Error(json?.error || 'Falha no login'); }
    return json as { user: CredentialSafe };

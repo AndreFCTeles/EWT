@@ -22,7 +22,7 @@ import {
    LS_SAVED,
    LS_AUTH,
    LS_KEEP
-} from '@/utils/types';
+} from '@/services/generalTypes';
 import login from './auth';
 
 

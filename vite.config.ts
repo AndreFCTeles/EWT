@@ -8,7 +8,11 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) }
+    alias: { 
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@checklist": fileURLToPath(new URL("./src/components/checklist", import.meta.url)),
+      "@steps": fileURLToPath(new URL("./src/components/steps", import.meta.url)),
+    }
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
@@ -33,6 +37,3 @@ export default defineConfig(async () => ({
     },
   },
 }));
-
-// ts-expect-error process is a nodejs global (@ts-expect-error)
-//const host = process.env.TAURI_DEV_HOST;

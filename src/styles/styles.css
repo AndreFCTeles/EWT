@@ -30,3 +30,15 @@
    width: 100% !important;
    min-width: 100% !important;
 }
+
+.mantine-Switch-input,
+.mantine-Switch-track,
+.mantine-Switch-label {
+   cursor: pointer;
+   /* font-weight: 600; */
+}
+
+.dt {
+   cursor: default;
+   /* font-weight: 600; */
+}

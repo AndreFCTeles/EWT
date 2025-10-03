@@ -1,6 +1,6 @@
 /* |--- IMPORTS ---| */
 
-// Frameworks0
+// Frameworks
 import React, {
    useState,
    useEffect,
@@ -8,34 +8,41 @@ import React, {
 } from 'react';
 import { 
    AppShell,
-   //Button,
+   Button,
    //Stack,
-   //Flex,
+   Flex,
+   Fieldset,
+   Switch,
    Modal,
    Container,
+   Text,
    //Notification,
-   Transition
+   Transition,
+   useMantineColorScheme, 
+   useComputedColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-//import { notifications } from '@mantine/notifications';
+import { IconSun, IconMoon } from '@tabler/icons-react';
+//import { FaSun, FaMoon } from 'react-icons/fa';
+// Utils
+import dayjs from '@/lib/dayjs-setup';
 // Components
 import LoginModal from '@/components/login/LoginModal';
-//import Process from '@/Process';
-// Utils
 import login from '@/components/login/auth';
-import { ChecklistController } from '@/components/checklist/ChecklistController';
-import { Submission } from '@/components/checklist/types';
+import { ChecklistController } from '@checklist/ChecklistController';
+import { Submission } from '@/components/checklist/checklistTypes';
 import { AdminHUD } from '@/components/admin/AdminHUD';
+import Clock from '@/components/clock/Clock';
 // Types
 import { 
    Role,
-   //mainComponents, 
-   //processes,
    CredentialSafe,
    APP_NAME,
    LS_AUTH,
-   LS_KEEP
-} from '@/utils/types';
+   LS_KEEP,
+   //LS_VIEW,
+   UIVIEW
+} from '@/services/generalTypes';
 
 
 
@@ -47,14 +54,17 @@ const initialSubmission: Submission = {
       templateVer: '2025-09-19' 
    },
    dut: { 
-      model: 'ELECTREX-600', 
-      serial: 'SN-0001', 
-      processes: ['MIG', 'TIG', 'MMA'] 
+      prodName: 'MIG 604 CW', 
+      brand: 'ELECTREX',
+      serialno: 'N/D', 
+      ratedCurrent: 600,
+      processes: ['MIG'],
+      origin: 'db'
    },
    instruments: { 
       meterId: 'FLUKE-1', 
       meterCal: '2025-01-01', 
-      lbId: 'LB-42' 
+      lbId: 'N/D' 
    },
    steps: [],
 };
@@ -70,18 +80,19 @@ const App: React.FC  = () => {
    
    /* |--- STATES ---| */
    // Autenticação e níveis de acesso
-   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------ Mostra modal de login
-   const [isLoggedIn, setIsLoggedIn] = useState(false); // -------------------------------------- Ativa/muda elementos UI após login
-   const [authUser, setAuthUser] = useState<CredentialSafe | null>(null); // -------------------- Muda acesso a funcionalidades consoante autorização de login
-   const [role, setRole] = useState<Role>('user');
+   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------- Mostra modal de login
+   const [isLoggedIn, setIsLoggedIn] = useState(true); // -------------------------------------- Ativa/muda elementos UI após login
+   const [authUser, setAuthUser] = useState<CredentialSafe>(); // ------------------------------- Muda acesso a funcionalidades consoante autorização de login
+   const [role, setRole] = useState<Role>('admin');//('not_logged');
 // const roleRank: Record<Role, number> = { user: 0, admin: 1, superadmin: 2 }; // -------------- Nível de acesso
    const [authBooting, setAuthBooting] = useState(true); // ------------------------------------- Auto-login
-   const [showChangePw, setShowChangePw] = useState(false); // ---------------------------------- Comportamento de modal de mudança de password
+   //const [showChangePw, setShowChangePw] = useState(false); // -------------------------------- Comportamento de modal de mudança de password
    const [persistLogin, setPersistLogin] =  // -------------------------------------------------- Mantém user ligado (skip login)
       useState<boolean>(() => {
          return localStorage.getItem(LS_KEEP) === '1';
       });
    // Sistema de Notificações
+   /*
    const [notification, setNotification] = useState<{
       visible: boolean;
       title: string;
@@ -102,27 +113,17 @@ const App: React.FC  = () => {
       });
       setTimeout(() => { setNotification((prevState) => ({ ...prevState, visible: false })); }, 5000);
    }, []);
-   // Component management & nav
-// const [currentComponent, setCurrentComponent] = useState<mainComponents | processes>('process');
-// const [previousComponent, setPreviousComponent] = useState<mainComponents | processes>('process');
-   const [submission, setSubmission] = useState<Submission>(initialSubmission);
-   const [navOpened, { toggle: toggleNav }] = useDisclosure(role==='admin');
-
-   // Content
-   /*
-   const renderComponent = () => {
-      switch (currentComponent) {
-         case 'process':
-            return   <Process />;
-         case 'login':
-            return   <div>login form</div>;
-         case 'wait':
-            return   <div>awaiting input...</div>;
-         default:
-            return   <div>Em desenvolvimento</div>;
-      }
-   };
    */
+   // Component management & nav
+   const [submission, setSubmission] = useState<Submission>(initialSubmission);
+   // UI/UX Basics
+   const [navOpened, { toggle: toggleNav }] = useDisclosure();
+   const { setColorScheme } = useMantineColorScheme({ keepTransitions: true });
+   const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
+   const isDark = computed === 'dark';
+   const [uiView, setUiView] = useState<UIVIEW>('basic');
+   // DayJS
+   const date = dayjs().format('DD/MM/YYYY');
 
 
 
@@ -133,27 +134,28 @@ const App: React.FC  = () => {
    // Login
    const handleLoginSuccess = (user: CredentialSafe) => {
       setAuthUser(user);
+      setRole(user.roles)
       setIsLoggedIn(true);
       setShowLoginModal(false);
    };
    const handleLoginClose = () => { setShowLoginModal(false); } // IMPORTANTE - Separei close de open por causa de bugs com a tecla Esc
    //const handlePersistToggle = useCallback((checked: boolean) => { setPersistLogin(checked); }, []); // passar computed canChangePassword 
-   /*
    const handleLogout = useCallback(() => {
-      setAuthUser(null);
+      setAuthUser(undefined);
       setIsLoggedIn(false);
       setPersistLogin(false);
       localStorage.removeItem(LS_KEEP);
       localStorage.removeItem(LS_AUTH);
-      setShowChangePw(false);
+      setShowLoginModal(true);
+      //setShowChangePw(false);
    }, []);
-   */
 
 
 
 
    /* |--- EFFECTS ---| */
-   useEffect(() => { // Manter user logged in
+   // Manter user logged in
+   useEffect(() => { 
       if (persistLogin) {
          localStorage.setItem(LS_KEEP, '1');
       } else {
@@ -194,15 +196,16 @@ const App: React.FC  = () => {
       layout="alt"
       transitionTimingFunction="ease"
       transitionDuration={500}
-      header={{height: 48}}
+      header={{height: 50}}
       navbar={{ 
-         width: navOpened ? 320 : 0, 
+         width: navOpened&&isLoggedIn ? 320 : 0, 
          breakpoint: 'sm',
          collapsed: {
-            mobile: !navOpened, 
-            desktop: !navOpened
+            mobile: !navOpened&&!isLoggedIn, 
+            desktop: !navOpened&&!isLoggedIn
          }
       }}
+      footer={{height: 50}}
       bg={'blue.1'}
       >
 
@@ -214,26 +217,59 @@ const App: React.FC  = () => {
          duration={500}
          >
             {(transitionStyle) => (
-               <AppShell.Navbar p={navOpened ? "sm" : 0} style={{ ...transitionStyle}} >
-                  {/* navOpened && ( <AdminHUD submission={submission} />) */}
-                  <AdminHUD submission={submission} importstyle={transitionStyle} />
+               <AppShell.Navbar p={navOpened&&isLoggedIn ? "sm" : 0} style={{ ...transitionStyle}} >
+                  {navOpened&&isLoggedIn && ( 
+                     <Flex 
+                     direction={'column'} 
+                     w={"100%"} 
+                     h={"100%"} 
+                     justify={"space-between"} 
+                     align={'center'} 
+                     p={0} 
+                     m={0}>
+                        <AdminHUD 
+                        submission={submission} 
+                        importstyle={transitionStyle} 
+                        user={authUser?.nome} />
+               
+                        <Button 
+                        fullWidth
+                        onClick={()=>{ 
+                           console.log('toggle adminview'); 
+                           setUiView(uiView==='basic'?'advanced':'basic')
+                        }}>{uiView==='basic'?'Advanced':'Basic'}</Button>
+                     </Flex>
+                  )}
                </AppShell.Navbar>
             )}
          </Transition>
          
 
-         <AppShell.Header>     
-            <Container size="lg" py={8}>
-               {/* put a role toggle for dev */}
-               <span 
-               style={{ cursor: 'pointer' }} 
-               onClick={() => {
-                  setRole(r => r === 'user' ? 'admin' : 'user')
-                  toggleNav();
-               }}>
-                  Role: <b>{role}</b>
-               </span>
-            </Container>    
+         <AppShell.Header>
+            { (role!=='not_logged') && 
+               <Flex 
+               w={"100%"} 
+               h={"100%"} 
+               justify={"space-between"} 
+               align={'center'} 
+               px={'xl'} 
+               py={0} 
+               m={0}>
+                  {/* put a role toggle for dev */}
+                  <span 
+                  style={{ cursor: 'pointer' }} 
+                  onClick={
+                     (role === 'admin'||'superadmin') 
+                     ? toggleNav 
+                     : ()=>{}
+                  }>Role: <b>{role}</b></span>
+               
+               <Button onClick={()=>{
+                  handleLogout();
+                  setRole('not_logged');
+                  !navOpened;
+               }}>logout</Button>
+            </Flex>}
          </AppShell.Header>
 
 
@@ -251,7 +287,7 @@ const App: React.FC  = () => {
             {!authBooting && showLoginModal && (
                <Modal
                opened={showLoginModal}
-               onClose={() => setShowLoginModal(false)}
+               onClose={() => {}}//setShowLoginModal(false)}
                title=""
                centered
                withCloseButton={false}
@@ -272,6 +308,35 @@ const App: React.FC  = () => {
                </Modal>
             )}
          </AppShell.Main>
+         
+
+            <AppShell.Footer>
+               <Flex w={"100%"} h={"100%"} justify={"space-between"}>
+                  <Fieldset 
+                  ml={'xl'} 
+                  py={0}  
+                  radius="xl" 
+                  variant="filled"
+                  legend={`Modo ${isDark?'Escuro':'Claro'}`}
+                  >
+                     <Flex justify="center" p={0} m={0}>
+                        <Switch
+                        p={0} m={0}
+                        checked={isDark}
+                        color="dark.4"
+                        onLabel={<IconSun size={16} stroke={2.5} color="var(--mantine-color-yellow-4)" />}
+                        offLabel={<IconMoon size={16} stroke={2.5} color="var(--mantine-color-blue-6)" />}
+                        onChange={()=>{ setColorScheme(isDark ? 'light' : 'dark'); }}
+                        />
+                     </Flex>
+                  </Fieldset>
+                     
+                  <Flex direction={"column"} justify="center" gap={0} align={"center"} h={"100%"} mr={'xl'} >
+                     <Text lh={1} fw={300} p={0} m={0} className='dt'><Clock /></Text>{/*time.format('HH:mm:ss')*/}
+                     <Text lh={1} fw={500} p={0} m={0} className='dt'>{date}</Text>{/*<Text mt={'xs'} fw={500}>Nome do utilizador</Text>*/}
+                  </Flex>
+               </Flex>
+            </AppShell.Footer>
 
 
       </AppShell>

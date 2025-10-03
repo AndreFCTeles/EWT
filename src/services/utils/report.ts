@@ -1,4 +1,5 @@
-import { Submission, Verdict } from '@/components/checklist/types';
+import { Submission, Verdict } from '@checklist/checklistTypes';
+import dayjs from '@/lib/dayjs-setup';
 
 export function buildReport(sub: Submission) {
    const finalVerdict: Verdict =
@@ -8,7 +9,7 @@ export function buildReport(sub: Submission) {
    return {
       ...sub,
       finalVerdict,
-      generatedAt: new Date().toISOString(),
+      generatedAt: dayjs().toISOString(),
       version: 1,
    };
 }

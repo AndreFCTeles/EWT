@@ -1,20 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button, Group, Text } from '@mantine/core';
 import { StepShell } from './StepShell';
-import { signals } from '@/services/signal';
-import { Tol, verdict as evalVerdict } from '@/services/tolerances';
-import type { StepRuntimeProps } from '@/components/checklist/pipeline';
-
-import dayjs from 'dayjs';
-import 'dayjs/locale/pt';
-dayjs.locale('pt');
-
+import { signals } from '@/services/utils/signal';
+import { Tol, verdict as evalVerdict } from '@/services/utils/tolerances';
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import dayjs from '@/lib/dayjs-setup';
 
 
 const OCV_TOL: Tol = { kind: 'combo', abs: 2.0, pct: 3 }; // example
 
-export const OcvStep: React.FC<StepRuntimeProps> = ({ id, complete, submission, isActive }) => {
-   const [reading, setReading] = React.useState<number | null>(null);
+export const OcvStep: React.FC<StepRuntimeProps> = ({ id, complete,  isActive }) => {//submission,
+   const [reading, setReading] = useState<number | null>(null);
    const target = 80; // for now; later read from submission/specs
 
    const onMeasure = async () => {
