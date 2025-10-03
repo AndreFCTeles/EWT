@@ -1,17 +1,15 @@
-
 import React from 'react';
-import type { StepRuntimeProps } from '@checklist/pipeline';
-import type { StepId } from '@checklist/checklistTypes';
-import { ConnectionsStep } from '@steps/ConnectionStep';
-import { InterlocksStep } from '@steps/InterlockStep';
+
+import type { StepRuntimeProps } from '@/components/checklist/pipeline';
+import SkipStep from '@checklist/SkipStep';
+
+import type { StepId } from '@/types/checklistTypes';
+
+// Steps
+import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPickSteps';
+import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { DetectDutStep } from '@steps/DetectDutStep';
-import { SummaryStep } from '@steps/SummaryStep';
-import { ExportStep } from '@steps/ExportStep';
-import { OcvStep } from '@steps/OcvStep';
-import SkipStep from './SkipStep';
-import { PickProcessStep } from '../steps/PickProcessStep';
-import { PickPowerStep } from '../steps/PickPowerStep';
-import { PickBrandStep } from '../steps/PickBrandStep';
+import { SummaryStep, ExportStep } from '@steps/SummaryExport';
 
 
 

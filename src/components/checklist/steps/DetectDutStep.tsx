@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import type { StepRuntimeProps } from '@checklist/pipeline';
-import { probeConnectedDut, lookupDutByHwId } from '@/services/utils/devices';
-import { productToDut } from '@/services/utils/dutRuntime';
-import dayjs from '@/lib/dayjs-setup';
+import type { StepRuntimeProps } from '@/components/checklist/pipeline';
+import { probeConnectedDut, lookupDutByHwId } from '@/services/utils/hardware';
+import { productToDut } from '@/services/utils/dut';
+import { nowIso } from '@/services/utils/generalUtils';
+//import dayjs from '@/lib/dayjs-setup';
 
 
 
@@ -11,13 +12,13 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
       if (!isActive) return;
 
       (async () => {
-         const startedAt = dayjs().toISOString();
+         const startedAt = nowIso();
 
          const probe = await probeConnectedDut();
          if (!probe.connected) {
             // Not connected → force manual selection
             return complete({
-               id, startedAt, endedAt: dayjs().toISOString(),
+               id, startedAt, endedAt: nowIso(),
                verdict: 'warn', notes: ['DUT not connected'],
             }, { manualSelect: true });
          }
@@ -26,7 +27,7 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
          if (!dbproduct) {
             // Connected but unknown → manual selection
             return complete({
-               id, startedAt, endedAt: dayjs().toISOString(),
+               id, startedAt, endedAt: nowIso(),
                verdict: 'warn', notes: ['DUT not found in DB'],
             }, { manualSelect: true });
          }
@@ -34,21 +35,9 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
          
          const dut = productToDut(dbproduct, 'db');
          return complete({ 
-            id, startedAt, endedAt: dayjs().toISOString(), 
+            id, startedAt, endedAt: nowIso(), 
             verdict: 'pass' 
          },{ manualSelect: false, productData: dbproduct, dut });
-         /*
-         // Recognized → patch DUT + skip manual picks
-         return complete({
-            id, startedAt, endedAt: dayjs().toISOString(),
-            verdict: 'pass',
-            inputs: { hwId: probe.hwId, serial: probe.serial },
-         }, {
-            manualSelect: false,
-            // normalize DUT from DB
-            dutPatched: true, // optional marker
-         });
-         */
 
       })();
    }, [id, isActive, complete]);

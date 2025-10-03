@@ -30,7 +30,7 @@ import dayjs from '@/lib/dayjs-setup';
 import LoginModal from '@/components/login/LoginModal';
 import login from '@/components/login/auth';
 import { ChecklistController } from '@checklist/ChecklistController';
-import { Submission } from '@/components/checklist/checklistTypes';
+import { Submission } from '@/types/checklistTypes';
 import { AdminHUD } from '@/components/admin/AdminHUD';
 import Clock from '@/components/clock/Clock';
 // Types
@@ -42,7 +42,7 @@ import {
    LS_KEEP,
    //LS_VIEW,
    UIVIEW
-} from '@/services/generalTypes';
+} from '@/types/generalTypes';
 
 
 

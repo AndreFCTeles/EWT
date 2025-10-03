@@ -30,12 +30,20 @@
         "./src/components/checklist/*"
       ],
       "@steps/*": [
-        "./src/components/steps/*"
+        "./src/components/checklist/steps/*"
+      ],
+      "@utils/*": [
+        "./src/services/utils/*"
       ]
     }
   },
   "include": [
-    "src"
+    "src",
+    "BU/OcvStep.tsx",
+    "BU/InterlockStep.tsx",
+    "BU/ConnectionStep.tsx",
+    "BU/ExportStep.tsx",
+    "BU/SummaryStep.tsx"
   ],
   "references": [
     {

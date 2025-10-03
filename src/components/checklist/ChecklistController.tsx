@@ -3,12 +3,12 @@ import { Card, Loader, Text } from '@mantine/core';
 import dayjs from '@/lib/dayjs-setup';
 
 import { REGISTRY, shouldSkip, wasCompleted, StepRuntimeProps } from './pipeline';
-import { buildReport } from '@/services/utils/report';
+import { buildReport } from '@utils/report';
 //import { buildDummyDut } from '@/services/utils/dutBuilder';
-import { buildDummyProduct, dummyToDut } from '@/services/utils/dummyProduct';
+import { buildDummyProduct, dummyToDut } from '@/services/utils/dut';
 
-import { Submission, StepId, StepRecord, PIPELINE } from './checklistTypes'; 
-import { Role } from '@/services/generalTypes';
+import { Submission, StepId, StepRecord, PIPELINE } from '@/types/checklistTypes'; 
+import { Role } from '@/types/generalTypes';
 
 
 
@@ -44,7 +44,7 @@ export function ChecklistController({
    }, []); // }, [submission]);
 
    // --- Legacy: compute next using current submission in closure (still used by go-forward button if needed) ---
-   const nextIndex = useCallback((i: number) => nextIndexWith(i, submission), [submission, nextIndexWith]);
+   //const nextIndex = useCallback((i: number) => nextIndexWith(i, submission), [submission, nextIndexWith]);
 
 
    const prevCompletedIndex = useMemo(() => {
@@ -69,12 +69,14 @@ export function ChecklistController({
    */
 
    // Advance while skipping
+   /*
    const advance = useCallback((from = idx) => {
       let j = nextIndex(from);
       //while (j < PIPELINE.length && shouldSkip(PIPELINE[j], submission)) j++;
       if (j >= PIPELINE.length) return;
       setIdx(j);
    }, [idx, nextIndex]);
+   */
 
    const goBack = useCallback(() => {
       if (prevCompletedIndex >= 0) setIdx(prevCompletedIndex);

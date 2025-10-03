@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import type { StepRuntimeProps } from '@checklist/pipeline';
-import { StepShell } from '@steps/StepShell';
 import { Button, Group, Text } from '@mantine/core';
 import dayjs from '@/lib/dayjs-setup';
 
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import { StepShell } from '@checklist/steps/StepShell';
 
 
 
-export const StepTemplate: React.FC<StepRuntimeProps> = ({
+
+export const StepTemplate: React.FC<StepRuntimeProps> = ( {
    id, submission, role, alreadyCompleted, isActive,
    canGoBack, goBack, complete, abort,
-   }) => {
+} ) => {
    const [value, setValue] = useState<number | null>(alreadyCompleted ? 123 : null); // stub
 
    const onFinish = () => {

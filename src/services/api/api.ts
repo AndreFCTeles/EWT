@@ -1,5 +1,5 @@
-import delay from "../utils/delay";
-import { Brand, STUB_BRANDS } from "../generalTypes";
+import delay from "../utils/generalUtils";
+import { Brand, STUB_BRANDS } from "@/types/generalTypes";
 
 
 export async function getBrands(): Promise<Brand[]> {

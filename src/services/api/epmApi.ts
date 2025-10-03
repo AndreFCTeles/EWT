@@ -1,4 +1,4 @@
-import type { ProductData, Category } from '../productTypes'; // shared or codegen
+import type { ProductData, Category } from '../../types/productTypes'; // shared or codegen
 
 export async function fetchProducts(baseUrl: string): Promise<ProductData[]> {
    const r = await fetch(`${baseUrl}/epm/getProducts`);
@@ -19,14 +19,6 @@ export async function fetchUniqueSeries(baseUrl: string): Promise<Array<{label:s
 }
 
 // Derive unique brands from products (no dedicated endpoint yet)
-/*
-export async function fetchBrands(baseUrl: string): Promise<string[]> {
-   const r = await fetch(`${baseUrl}/epm/getProducts`);
-   const j = await r.json();
-   const items: ProductData[] = j.products ?? [];
-   return [...new Set(items.map(p => (p.brand || '').trim()).filter(Boolean))].sort();
-}
-*/
 export async function fetchBrands(baseUrl: string): Promise<string[]> {
    const products = await fetchProducts(baseUrl);
    return [...new Set(products.map(p => (p.brand || '').trim()).filter(Boolean))].sort();

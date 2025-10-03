@@ -11,7 +11,8 @@ export default defineConfig(async () => ({
     alias: { 
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@checklist": fileURLToPath(new URL("./src/components/checklist", import.meta.url)),
-      "@steps": fileURLToPath(new URL("./src/components/steps", import.meta.url)),
+      "@steps": fileURLToPath(new URL("./src/components/checklist/steps", import.meta.url)),
+      "@utils": fileURLToPath(new URL("./src/services/utils", import.meta.url)),
     }
   },
 

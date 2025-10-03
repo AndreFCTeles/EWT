@@ -1,5 +1,5 @@
-import type { StepId, Submission, StepRecord } from './checklistTypes';
-import type { Processes, Role } from '@/services/generalTypes';
+import type { StepId, Submission, StepRecord } from '@/types/checklistTypes';
+import type { Processes, Role } from '@/types/generalTypes';
 import { StepRegistry } from './StepRegistry';
 import SkipStep from './SkipStep';
 //import { PIPELINE } from './checklistTypes';

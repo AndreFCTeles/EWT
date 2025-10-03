@@ -1,8 +1,10 @@
-import { StepRuntimeProps } from '@checklist/pipeline';
-import { StepShell } from './StepShell';
-import { Table, Button, Group } from '@mantine/core';
-import React from 'react';
+import React, { useMemo } from 'react';
+import { Table, Button, Group, Code } from '@mantine/core';
 import dayjs from '@/lib/dayjs-setup';
+
+import { StepRuntimeProps } from '@checklist/pipeline';
+import { buildReport } from '@utils/report';
+import { StepShell } from './StepShell';
 
 
 export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete}) => {//, id 
@@ -33,6 +35,34 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
                endedAt: dayjs().toISOString(),
                verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass' //'pass', // compute stricter rule if needed
             })}>Proceed to Export</Button>
+         </Group>
+      </StepShell>
+   );
+};
+
+export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
+   const report = useMemo(() => buildReport(submission), [submission]);
+   const json = JSON.stringify(report, null, 2);
+
+   const slug = (s?: string) =>
+      (s ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+   const download = () => {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const name = `${slug(report.dut?.prodName)}-${report.reportId ?? Date.now()}.json`;
+      a.download = name;
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+   };
+
+   return (
+      <StepShell title="Export">
+         <Code block style={{ maxHeight: 300, overflow: 'auto' }}>{json}</Code>
+         <Group mt="md">
+            <Button onClick={download}>Download JSON</Button>
          </Group>
       </StepShell>
    );

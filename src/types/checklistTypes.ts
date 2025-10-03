@@ -1,7 +1,5 @@
-import { AvailablePowers, Processes } from "@/services/generalTypes";
-import { ProductData } from "@/services/productTypes";
-import type { DeviceOrigin } from "@/services/generalTypes";
-//import type { DutRuntime } from "@/services/utils/dutRuntime";
+import { AvailablePowers, Processes, DeviceOrigin } from "@/types/generalTypes";
+import { ProductData } from "@/types/productTypes";
 
 
 
@@ -39,21 +37,10 @@ export type Dut = {
    series?: string;
    serialno?: string;
    processes: Processes[];
-   ratedCurrent?: AvailablePowers; // optional; we’ll fill if we can
-   format?: string;              // derived from category.format or top-level format
+   ratedCurrent?: AvailablePowers;     // optional; we’ll fill if we can
+   format?: string;                    // derived from category.format or top-level format
    origin: DeviceOrigin;
 };
-
-/*
-export type DutRuntime = {
-   prodName: string;
-   brand: string;
-   series?: string;
-   processes: Processes[];
-   ratedCurrent?: AvailablePowers;
-   origin: DeviceOrigin;
-};
-*/
 
 
 
@@ -72,6 +59,10 @@ export type StepId =
    | 'summary' | 'export';
 
 export type Verdict = 'pass' | 'warn' | 'fail' | 'skipped';
+export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
+
+
+
 
 export type StepRecord = {
    id: StepId;
@@ -93,15 +84,6 @@ export type Submission = {
       templateVer: string; 
    };
    dut: Dut;
-   /*{ // device under test
-      model?: string; 
-      serial?: string; 
-      brand: string;
-      processes: Array<Processes>; 
-      ratedCurrent?: AvailablePowers;
-      firmware?: string; 
-      origin?: DeviceOrigin; 
-   };*/
    instruments: { 
       meterId: string; 
       meterCal: string; 
@@ -113,7 +95,6 @@ export type Submission = {
       mainsV?: number 
    };
    steps: StepRecord[];
-   //vars?: Record<string, any>;
    vars?: {
       manualSelect?: boolean;         // set true if auto-detect failed
       selectedProcess?: Processes;
@@ -149,7 +130,7 @@ export const SKIP: (s: Submission) => Partial<Record<StepId, boolean>> = (s) => 
    'proc:MIG:thermal': !s.dut.processes.includes('MIG'),
    'proc:MIG:gas': !s.dut.processes.includes('MIG'),
 
-   'proc:TIG:gas': /* maybe TIG gas only if spec says gas present */ false,
+   'proc:TIG:gas': false,  // maybe TIG gas only if spec says gas present
 
    // Skip VRD check if model has no VRD (handled inside OCV step or with a separate step)
    // Skip “pulse” where model lacks pulse mode, etc.
