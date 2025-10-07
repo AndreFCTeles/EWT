@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import type { StepRuntimeProps } from '@/components/checklist/pipeline';
-import { probeConnectedDut, lookupDutByHwId } from '@/services/utils/hardware';
-import { productToDut } from '@/services/utils/dut';
-import { nowIso } from '@/services/utils/generalUtils';
-//import dayjs from '@/lib/dayjs-setup';
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import { probeConnectedDut, lookupProductByHwId } from '@utils/hardware';
+import { productToDut } from '@utils/dut';
+import { nowIso } from '@utils/generalUtils';
 
 
 
@@ -18,26 +17,37 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
          if (!probe.connected) {
             // Not connected → force manual selection
             return complete({
-               id, startedAt, endedAt: nowIso(),
-               verdict: 'warn', notes: ['DUT not connected'],
+               id, 
+               startedAt, 
+               endedAt: nowIso(),
+               verdict: 'warn', 
+               notes: ['DUT not connected'],
             }, { manualSelect: true });
          }
 
-         const dbproduct = probe.hwId ? await lookupDutByHwId(probe.hwId) : null;
+         const dbproduct = probe.hwId ? await lookupProductByHwId(probe.hwId) : null;
          if (!dbproduct) {
             // Connected but unknown → manual selection
             return complete({
-               id, startedAt, endedAt: nowIso(),
-               verdict: 'warn', notes: ['DUT not found in DB'],
+               id, 
+               startedAt, 
+               endedAt: nowIso(),
+               verdict: 'warn', 
+               notes: ['DUT not found in DB'],
             }, { manualSelect: true });
          }
 
-         
          const dut = productToDut(dbproduct, 'db');
          return complete({ 
-            id, startedAt, endedAt: nowIso(), 
+            id, 
+            startedAt, 
+            endedAt: nowIso(), 
             verdict: 'pass' 
-         },{ manualSelect: false, productData: dbproduct, dut });
+         },{ 
+            manualSelect: false, 
+            productData: dbproduct, 
+            dut 
+         });
 
       })();
    }, [id, isActive, complete]);

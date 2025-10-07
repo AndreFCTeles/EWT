@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Group, List, Text, Alert } from '@mantine/core';
-import dayjs from '@/lib/dayjs-setup';
 
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import type  { Polarity } from '@/types/checklistTypes';
 import { StepShell } from './StepShell';
-import type { StepRuntimeProps } from '@/components/checklist/pipeline';
-import { verdictFromRanges, pctTolerance, absTolerance } from '@utils/measurement';
-import { signals } from '@utils/hardware'; // expect { subscribeInterlocks, measureOCV }
-import { Polarity } from '@/types/checklistTypes';
+import { 
+   verdictFromRanges, 
+   pctTolerance, 
+   absTolerance 
+} from '@utils/measurement';
+import { signals } from '@utils/hardware'; 
+import { nowIso } from '@utils/generalUtils';
 
 
 
@@ -43,8 +47,8 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
       if (allOk) {
          const t = setTimeout(() => complete({
             id,
-            startedAt: dayjs().toISOString(),
-            endedAt: dayjs().toISOString(),
+            startedAt: nowIso(),
+            endedAt: nowIso(),
             measured: {
                enclosureClosed: Number(state.enclosureClosed),
                eStopReleased: Number(state.eStopReleased),
@@ -70,7 +74,11 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
          </List>
          {!allOk && !alreadyCompleted && (
             <Group mt="md">
-               <Button variant="light" color="red" onClick={() => abort('Interlock not satisfied')}>Abort</Button>
+               <Button 
+               variant="light" 
+               color="red" 
+               onClick={() => abort('Interlock not satisfied')}
+               >Abort</Button>
             </Group>
          )}
       </StepShell>
@@ -98,8 +106,8 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
    const onNext = () => {
       complete({
          id,
-         startedAt: dayjs().toISOString(),
-         endedAt: dayjs().toISOString(),
+         startedAt: nowIso(),
+         endedAt: nowIso(),
          measured: { polarityOk: Number(polarity === 'ok') },
          verdict: polarity === 'ok' ? 'pass' : 'warn',
          notes: polarity === 'ok' ? [] : [`Polarity = ${polarity}`],
@@ -139,16 +147,23 @@ export const OcvStep: React.FC<StepRuntimeProps> = ({ id, complete, isActive }) 
       // Combine abs ±2.0V AND pct ±3% into a tighter intersection
       const passAbs = absTolerance(target, 2.0);
       const passPct = pctTolerance(target, 3);
-      const passRange = { min: Math.max(passAbs.min, passPct.min), max: Math.min(passAbs.max, passPct.max) };
+      const passRange = { 
+         min: Math.max(passAbs.min, passPct.min), 
+         max: Math.min(passAbs.max, passPct.max) 
+      };
       const verdict = verdictFromRanges(reading, passRange);
 
       complete({
          id,
-         startedAt: dayjs().toISOString(),
-         endedAt: dayjs().toISOString(),
+         startedAt: nowIso(),
+         endedAt: nowIso(),
          commanded: { state: 'no-load' },
          measured: { ocv: reading },
-         toleranceUsed: { abs: 2.0, pct: 3, combo: 'intersection' },
+         toleranceUsed: { 
+            abs: 2.0, 
+            pct: 3, 
+            combo: 'intersection' 
+         },
          verdict,
       });
    };

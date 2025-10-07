@@ -16,7 +16,6 @@ import {
 import { useForm } from '@mantine/form';
 import { 
    CredentialSafe, 
-   APP_NAME, 
    LS_LAST, 
    LS_REMEMBER, 
    LS_SAVED,
@@ -24,6 +23,7 @@ import {
    LS_KEEP
 } from '@/types/generalTypes';
 import login from './auth';
+import { APP_NAME } from '@/lib/config';
 
 
 // Props
@@ -105,8 +105,8 @@ const LoginModal: React.FC<LoginProps> = ({onLoginSuccess, onClose}) => {
                LS_AUTH,
                JSON.stringify({
                   username: username.trim(),
-                  password,        // appPass for this app (plaintext for now)
-                  app: APP_NAME,
+                  password,        // app_NameAPP_NAMEPass for this app_NameAPP_NAME (plaintext for now)
+                  app_NameAPP_NAME: APP_NAME,
                })
             );
          }

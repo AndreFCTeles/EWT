@@ -1,13 +1,21 @@
 import { Card, Group, Button, Text } from '@mantine/core';
 import React from 'react';
 
-export const StepShell: React.FC<{ 
+type SSProps = { 
    title: string; 
    canGoBack?: boolean;
    onBack?: () => void;
    right?: React.ReactNode; 
    children: React.ReactNode; 
-}> = ({ title, canGoBack, onBack, right, children }) => (
+}
+
+export const StepShell: React.FC<SSProps> = ( { 
+   title, 
+   canGoBack, 
+   onBack, 
+   right, 
+   children 
+} ) => (
    <Card withBorder shadow="sm" p="md">
       <Group justify="space-between" mb="xs">
          <Group gap="xs">

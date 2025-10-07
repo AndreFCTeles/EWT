@@ -38,12 +38,7 @@
     }
   },
   "include": [
-    "src",
-    "BU/OcvStep.tsx",
-    "BU/InterlockStep.tsx",
-    "BU/ConnectionStep.tsx",
-    "BU/ExportStep.tsx",
-    "BU/SummaryStep.tsx"
+    "src"
   ],
   "references": [
     {

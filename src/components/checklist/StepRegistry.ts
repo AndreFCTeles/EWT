@@ -1,21 +1,20 @@
 import React from 'react';
 
-import type { StepRuntimeProps } from '@/components/checklist/pipeline';
-import SkipStep from '@checklist/SkipStep';
+import type { StepRuntimeProps } from './pipeline';
+import SkipStep from './SkipStep';
 
 import type { StepId } from '@/types/checklistTypes';
 
 // Steps
 import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPickSteps';
 import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
-import { DetectDutStep } from '@steps/DetectDutStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
+import { DetectDutStep } from '@steps/DetectDutStep';
 
 
 
 // Script
 export const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
-
    login:                  SkipStep,        // stub
 
    specs:                  SkipStep,

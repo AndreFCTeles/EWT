@@ -1,7 +1,8 @@
-import { CredentialSafe, DB_HOST } from "@/types/generalTypes";
+import { CredentialSafe } from "@/types/generalTypes";
+import { API_URL } from "@/lib/config";
 
 const login = async(username: string, password: string, appName = 'JRMFerias') => {
-   const res = await fetch(`${DB_HOST}/api/auth/login`, {
+   const res = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, appName }),

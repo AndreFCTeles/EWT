@@ -2,12 +2,15 @@ import { AvailablePowers, Processes, DeviceOrigin } from "@/types/generalTypes";
 import { ProductData } from "@/types/productTypes";
 
 
+export type Verdict = 'pass' | 'warn' | 'fail' | 'skipped';
+export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
 
 export type ProductDoc = {
    _id?: { $oid: string };
    prodName: string;
    brand: string;
    series?: string;
+   serialno?: string;
    category: {
       main: string;
       sub?: {
@@ -58,8 +61,6 @@ export type StepId =
    | `proc:${'MIG' | 'TIG'}:gas`
    | 'summary' | 'export';
 
-export type Verdict = 'pass' | 'warn' | 'fail' | 'skipped';
-export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
 
 
 

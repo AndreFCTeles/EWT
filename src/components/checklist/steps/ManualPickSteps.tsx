@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Button, Group, ScrollArea, Text } from '@mantine/core';
-import dayjs from '@/lib/dayjs-setup';
+import { Button, Group, Loader, ScrollArea, Stack, Text } from '@mantine/core';
 
 import { StepShell } from './StepShell';
-import type { StepRuntimeProps } from '@/components/checklist/pipeline';
-import { DB_HOST, AvailablePowers, Processes } from '@/types/generalTypes'; //, Brand, STUBBIER_BRANDS_TYPE
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import type { AvailablePowers, Processes } from '@/types/generalTypes';
 import { fetchBrands } from '@/services/api/epmApi';
+import { nowIso } from '@utils/generalUtils';
+import { API_URL } from '@/lib/config';
 
 
 
 
+
+
+
+const PROCESSES: Processes[] = ['MIG', 'TIG', 'MMA'];
+const POWERS: AvailablePowers[] = [300, 400, 500, 600];
 
 
 
 // ---- PickProcess ----
-const PROCESSES: Processes[] = ['MIG', 'TIG', 'MMA'];
-
 export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
    const pick = (p: Processes) => {
-      const now = dayjs().toISOString();
+      const now = nowIso();
       complete(
          { 
             id, 
@@ -54,11 +58,9 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
 
 
 // ---- PickPower ----
-const POWERS: AvailablePowers[] = [300, 400, 500, 600];
-
 export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
    const pick = (a: AvailablePowers) => {
-      const now = dayjs().toISOString();
+      const now = nowIso();
       complete(
          { 
             id, 
@@ -103,7 +105,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
       (async () => {
          setLoading(true);
          try {
-            const b = await fetchBrands(DB_HOST);
+            const b = await fetchBrands(API_URL);
             if (live) setBrands(b);
          } finally { if (live) setLoading(false); }
       })();
@@ -111,7 +113,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
    }, []);
 
    const choose = (brandName: string) => {
-      const now = dayjs().toISOString();
+      const now = nowIso();
       complete(
          { 
             id, 
@@ -133,12 +135,17 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
       canGoBack={canGoBack} 
       onBack={goBack}>
          {loading ? 
-         <Text size="sm">Loading brands…</Text> :
-         <ScrollArea h={220}>
-            <Group wrap="wrap" gap="xs">
-               {brands.map(b => <Button key={b} variant="default" onClick={() => choose(b)}>{b}</Button>)}
-            </Group>
-         </ScrollArea>}
+            <Stack>
+               <Text size="sm">Loading brands…</Text>
+               <Loader />
+            </Stack> 
+         :
+            <ScrollArea h={220}>
+               <Group wrap="wrap" gap="xs">
+                  {brands.map(b => <Button key={b} variant="default" onClick={() => choose(b)}>{b}</Button>)}
+               </Group>
+            </ScrollArea>
+         }
       </StepShell>
    );
 };

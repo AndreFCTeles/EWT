@@ -1,4 +1,4 @@
-import type { ProductData, Category } from '../../types/productTypes'; // shared or codegen
+import type { ProductData, Category } from '@/types/productTypes'; // shared or codegen
 
 export async function fetchProducts(baseUrl: string): Promise<ProductData[]> {
    const r = await fetch(`${baseUrl}/epm/getProducts`);

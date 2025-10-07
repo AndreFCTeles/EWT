@@ -1,6 +1,3 @@
-export const DB_HOST             = 'http://192.168.0.12:8080';
-export const APP_NAME            = 'Banca';
-
 // USER SETTINGS
 export const LS_LAST             = 'ewt_lastUsername';   // last username (conveniência)
 export const LS_REMEMBER         = 'ewt_rememberMe';     // '1' | '0'  (remember username)
@@ -12,7 +9,7 @@ export const LS_VIEW             = 'ewt_uiView';         // 'basic' | 'advanced'
 export type UIVIEW               = 'basic' | 'advanced'
 
 
-
+export const MANUAL_TOGGLE = true;
 
 
 // AUTHENTICATION

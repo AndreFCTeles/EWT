@@ -52,7 +52,7 @@ export function shouldSkip(step: StepId, s: Submission): boolean {
    // Process-specific blocks already skip when DUT lacks the process
    if (step.startsWith('proc:')) {
       const proc = step.split(':')[1] as Processes;
-      if (!s.dut.processes.includes(proc)) return true;
+      if (s.dut && !s.dut.processes.includes(proc)) return true;
       if (step === 'proc:MIG:pulse' && !s.vars?.['mig.usePulse']) return true;
    }
 

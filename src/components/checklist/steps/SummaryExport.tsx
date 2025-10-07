@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { Table, Button, Group, Code } from '@mantine/core';
-import dayjs from '@/lib/dayjs-setup';
 
-import { StepRuntimeProps } from '@checklist/pipeline';
+import type { StepRuntimeProps } from '@checklist/pipeline';
+import { nowIso } from '@utils/generalUtils';
 import { buildReport } from '@utils/report';
 import { StepShell } from './StepShell';
 
@@ -31,9 +31,9 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
          <Group mt="md">
             <Button onClick={() => complete({
                id: 'summary',
-               startedAt: dayjs().toISOString(),
-               endedAt: dayjs().toISOString(),
-               verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass' //'pass', // compute stricter rule if needed
+               startedAt: nowIso(),
+               endedAt: nowIso(),
+               verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass'
             })}>Proceed to Export</Button>
          </Group>
       </StepShell>
@@ -45,7 +45,10 @@ export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
    const json = JSON.stringify(report, null, 2);
 
    const slug = (s?: string) =>
-      (s ?? 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      (s ?? 'report')
+         .toLowerCase()
+         .replace(/[^a-z0-9]+/g, '-')
+         .replace(/(^-|-$)/g, '');
 
    const download = () => {
       const blob = new Blob([json], { type: 'application/json' });

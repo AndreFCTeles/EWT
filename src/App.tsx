@@ -23,29 +23,31 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { IconSun, IconMoon } from '@tabler/icons-react';
-//import { FaSun, FaMoon } from 'react-icons/fa';
 // Utils
 import dayjs from '@/lib/dayjs-setup';
+import { APP_NAME } from '@/lib/config';
 // Components
 import LoginModal from '@/components/login/LoginModal';
 import login from '@/components/login/auth';
 import { ChecklistController } from '@checklist/ChecklistController';
-import { Submission } from '@/types/checklistTypes';
 import { AdminHUD } from '@/components/admin/AdminHUD';
 import Clock from '@/components/clock/Clock';
 // Types
 import { 
    Role,
    CredentialSafe,
-   APP_NAME,
    LS_AUTH,
    LS_KEEP,
    //LS_VIEW,
    UIVIEW
 } from '@/types/generalTypes';
+import { Submission } from '@/types/checklistTypes';
+//import { nowIso } from './services/utils/generalUtils';
+import { getInitialSubmission } from './dev/bootstrap';
 
 
 
+/*
 const initialSubmission: Submission = {
    header: { 
       operator: 'demo', 
@@ -56,6 +58,7 @@ const initialSubmission: Submission = {
    dut: { 
       prodName: 'MIG 604 CW', 
       brand: 'ELECTREX',
+      series: '4',
       serialno: 'N/D', 
       ratedCurrent: 600,
       processes: ['MIG'],
@@ -68,7 +71,7 @@ const initialSubmission: Submission = {
    },
    steps: [],
 };
-
+*/
 
 
 
@@ -77,7 +80,7 @@ const initialSubmission: Submission = {
 
 /* |--- COMPONENT ---| */
 const App: React.FC  = () => {
-   
+
    /* |--- STATES ---| */
    // Autenticação e níveis de acesso
    const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------- Mostra modal de login
@@ -115,7 +118,8 @@ const App: React.FC  = () => {
    }, []);
    */
    // Component management & nav
-   const [submission, setSubmission] = useState<Submission>(initialSubmission);
+   //const [submission, setSubmission] = useState<Submission>(initialSubmission);
+   const [submission, setSubmission] = useState<Submission>(() => getInitialSubmission());
    // UI/UX Basics
    const [navOpened, { toggle: toggleNav }] = useDisclosure();
    const { setColorScheme } = useMantineColorScheme({ keepTransitions: true });
@@ -189,7 +193,6 @@ const App: React.FC  = () => {
 
 
 
-
    /* |--- JSX / RENDER APP ---| */
    return (
       <AppShell 
@@ -209,8 +212,8 @@ const App: React.FC  = () => {
       bg={'blue.1'}
       >
 
-         
-         
+
+
          <Transition 
          mounted={navOpened} 
          transition={"scale-x"}
@@ -231,7 +234,7 @@ const App: React.FC  = () => {
                         submission={submission} 
                         importstyle={transitionStyle} 
                         user={authUser?.nome} />
-               
+
                         <Button 
                         fullWidth
                         onClick={()=>{ 
@@ -243,7 +246,7 @@ const App: React.FC  = () => {
                </AppShell.Navbar>
             )}
          </Transition>
-         
+
 
          <AppShell.Header>
             { (role!=='not_logged') && 
@@ -263,7 +266,7 @@ const App: React.FC  = () => {
                      ? toggleNav 
                      : ()=>{}
                   }>Role: <b>{role}</b></span>
-               
+
                <Button onClick={()=>{
                   handleLogout();
                   setRole('not_logged');
@@ -283,7 +286,7 @@ const App: React.FC  = () => {
                // you can pass jumpTo for admin here later
                />
             </Container>
-            
+
             {!authBooting && showLoginModal && (
                <Modal
                opened={showLoginModal}
@@ -308,7 +311,7 @@ const App: React.FC  = () => {
                </Modal>
             )}
          </AppShell.Main>
-         
+
 
             <AppShell.Footer>
                <Flex w={"100%"} h={"100%"} justify={"space-between"}>
@@ -330,7 +333,7 @@ const App: React.FC  = () => {
                         />
                      </Flex>
                   </Fieldset>
-                     
+
                   <Flex direction={"column"} justify="center" gap={0} align={"center"} h={"100%"} mr={'xl'} >
                      <Text lh={1} fw={300} p={0} m={0} className='dt'><Clock /></Text>{/*time.format('HH:mm:ss')*/}
                      <Text lh={1} fw={500} p={0} m={0} className='dt'>{date}</Text>{/*<Text mt={'xs'} fw={500}>Nome do utilizador</Text>*/}
@@ -350,4 +353,3 @@ const App: React.FC  = () => {
 }
 
 export default App
-

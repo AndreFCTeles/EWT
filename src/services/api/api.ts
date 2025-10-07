@@ -1,4 +1,4 @@
-import delay from "../utils/generalUtils";
+import { delay } from "@utils/generalUtils";
 import { Brand, STUB_BRANDS } from "@/types/generalTypes";
 
 
