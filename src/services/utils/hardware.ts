@@ -42,8 +42,9 @@ export async function lookupProductByHwId(hwId: string): Promise<ProductData | n
    await delay(150);
    if (!DEV_STUB_DB_MATCH) return null;
    return {
-      prodName: 'MIG 600A DB',
+      prodName: 'MIG 604 CW',
       brand: 'Electrex',
+      series: '4',
       category: { 
          main: 'maq', 
          sub: { 
@@ -80,9 +81,7 @@ export async function lookupProductByHwId(hwId: string): Promise<ProductData | n
 export type Signals = {
    getInterlocks(): Promise<InterlockState>;
    subscribeInterlocks(cb: (s: InterlockState) => void): () => void;
-
    measureOCV(): Promise<{ voltage: number }>;
-
    // stream API - high-rate logging
 };
 

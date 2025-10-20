@@ -1,11 +1,11 @@
 import type { Submission } from '@/types/checklistTypes';
-import { DEV_FORCE_MODE } from '@/dev/devConfig';
-import { nowIso } from '@/services/utils/generalUtils';
+//import { DEV } from '@/dev/devConfig';
+import { nowIso } from '@utils/generalUtils';
 
 // Minimal, safe defaults so the app never crashes on "empty" starts.
 // No DUT by default; manual path if forced; steps array always defined.
 export function getInitialSubmission(): Submission {
-   const manual = DEV_FORCE_MODE === 'manual';
+   // const manual = DEV.DETECTION_MODE === 'manual';
 
    return {
       header: {
@@ -14,14 +14,25 @@ export function getInitialSubmission(): Submission {
          appVer: import.meta.env?.VITE_APP_VERSION ?? 'dev',
          templateVer: nowIso().slice(0, 10),
       },
-      // No dut: start truly "empty".
-      // dut: undefined,
+      // STUB DUT
+      /*
+      dut: { 
+         prodName: 'MIG 604 CW', 
+         brand: 'ELECTREX',
+         series: '4',
+         serialno: 'N/D', 
+         ratedCurrent: 600,
+         processes: ['MIG'],
+         origin: 'db'
+      },
+      */
+      dut: undefined,
       instruments: {
          meterId: '',
          meterCal: '',
          lbId: '',
       },
       steps: [],
-      vars: manual ? { manualSelect: true } : {},  // supports your current boolean
+      //vars: manual ? { manualSelect: true } : {},  // supports your current boolean
    };
 }

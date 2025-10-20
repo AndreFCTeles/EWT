@@ -9,7 +9,7 @@ export const LS_VIEW             = 'ewt_uiView';         // 'basic' | 'advanced'
 export type UIVIEW               = 'basic' | 'advanced'
 
 
-export const MANUAL_TOGGLE = true;
+// export const MANUAL_TOGGLE = true;
 
 
 // AUTHENTICATION
@@ -80,9 +80,9 @@ export type Probe = {
    serial?: string;
 }
 
-export type Processes            = "MIG" | "MMA" | "TIG";
-export type AvailablePowers      = 300 | 400 | 500 | 600;
-export type DeviceOrigin         = 'db' | 'manual';
+//export type Processes            = "MIG" | "MMA" | "TIG";
+//export type AvailablePowers      = 300 | 400 | 500 | 600;
+//export type DeviceOrigin         = 'db' | 'manual';
 export type Brand = { id: string; name: string };
 export type Range = { min: number; max: number };
 

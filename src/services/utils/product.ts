@@ -1,5 +1,6 @@
 import type { ProductData, ProdCategory, TechnicalData } from '@/types/productTypes';
-import type { Processes, AvailablePowers } from '@/types/generalTypes';
+//import type { Processes, AvailablePowers } from '@/types/generalTypes';
+import type { Process, RatedCurrent } from '@/types/protocolTypes';
 
 
 
@@ -19,9 +20,9 @@ export function getCategoryPath(cat?: ProdCategory): string[] {
 
 
 /** Derive welding processes from category values. */
-export function deriveProcesses(cat?: ProdCategory): Processes[] {
+export function deriveProcesses(cat?: ProdCategory): Process[] {
    const vals = getCategoryPath(cat).map(v => v.toLowerCase());
-   const hits = new Set<Processes>();
+   const hits = new Set<Process>();
    if (vals.some(v => v.includes('maq-mig'))) hits.add('MIG');
    if (vals.some(v => v.includes('maq-tig'))) hits.add('TIG');
    if (vals.some(v => v.includes('maq-mma'))) hits.add('MMA');
@@ -75,7 +76,7 @@ export function findNumber(
    tech: TechnicalData[],
    keys: RegExp[],
    toRated?: boolean
-): number | AvailablePowers | undefined {
+): number | RatedCurrent | undefined {
    const row = tech.find(t => keys.some(k => k.test(t.field)));
    if (!row?.value) return undefined;
 
@@ -83,7 +84,7 @@ export function findNumber(
    if (!isFinite(n)) return undefined;
    if (!toRated) return n;
    
-   const candidates: AvailablePowers[] = [300,400,500,600];
+   const candidates: RatedCurrent[] = [300,400,500,600];
    return candidates.reduce((best, a) => Math.abs(a - n) < Math.abs(best - n) ? a : best);
 }
 

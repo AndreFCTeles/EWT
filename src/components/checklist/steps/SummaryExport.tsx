@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import { Table, Button, Group, Code } from '@mantine/core';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
+import { StepShell } from '@checklist/StepShell';
 import { nowIso } from '@utils/generalUtils';
 import { buildReport } from '@utils/report';
-import { StepShell } from './StepShell';
 
 
 export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete}) => {//, id 
@@ -18,7 +18,7 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
 
    return (
       <StepShell title="Summary">
-         <Table withTableBorder>
+         <Table.ScrollContainer minWidth={500}><Table withTableBorder>
             <Table.Thead>
                <Table.Tr>
                   <Table.Th>Step</Table.Th>
@@ -27,14 +27,16 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
                </Table.Tr>
             </Table.Thead>
             <Table.Tbody>{rows}</Table.Tbody>
-         </Table>
+         </Table></Table.ScrollContainer>
          <Group mt="md">
-            <Button onClick={() => complete({
-               id: 'summary',
-               startedAt: nowIso(),
-               endedAt: nowIso(),
-               verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass'
-            })}>Proceed to Export</Button>
+            <Button onClick={() => complete(
+               {
+                  id: 'summary',
+                  startedAt: nowIso(),
+                  endedAt: nowIso(),
+                  verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass'
+               }, { manualSelect: true }
+            )}>Proceed to Export</Button>
          </Group>
       </StepShell>
    );

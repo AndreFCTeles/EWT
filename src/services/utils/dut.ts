@@ -1,18 +1,19 @@
 import { currentFromTechnical, deriveProcesses } from './product';
-import dayjs from '@/lib/dayjs-setup';
 
-import { Processes, DeviceOrigin, AvailablePowers } from '@/types/generalTypes'; // , STUBBIER_BRANDS_TYPE
-import { ProductData, ProdCategory } from '@/types/productTypes';
-import { Dut } from '@/types/checklistTypes';
-
-
-
-export const ALLOWED_POWERS: AvailablePowers[] = [300, 400, 500, 600];
+//import { Processes, DeviceOrigin, AvailablePowers } from '@/types/generalTypes'; // , STUBBIER_BRANDS_TYPE
+import type { Process, DeviceOrigin, RatedCurrent } from '@/types/protocolTypes';
+import type { ProductData, ProdCategory } from '@/types/productTypes';
+import type { Dut } from '@/types/checklistTypes';
+import { nowIso } from './generalUtils';
 
 
 
+export const ALLOWED_POWERS: RatedCurrent[] = [300, 400, 500, 600];
 
-function defaultCategory(process: Processes): ProdCategory {
+
+
+
+function defaultCategory(process: Process): ProdCategory {
    const base = { main: 'maq' };
    if (process === 'MIG') return { 
       ...base, 
@@ -63,7 +64,7 @@ function processesFromCategory(cat?: ProdCategory): Processes[] {
 
 
 
-export function snapRated(n?: number): AvailablePowers | undefined {
+export function snapRated(n?: number): RatedCurrent | undefined {
    if (n == null || !Number.isFinite(n)) return;
    return ALLOWED_POWERS.reduce((best, a) => 
       Math.abs(a - n) < Math.abs(best - n) ? a : best, 
@@ -104,13 +105,13 @@ export function productToDut(p: ProductData, origin: DeviceOrigin = 'db'): Dut {
 
 
 export function buildDummyProduct(
-   process: Processes, 
-   powerA: AvailablePowers, 
+   process: Process, 
+   powerA: RatedCurrent, 
    brand: string, //STUBBIER_BRANDS_TYPE, 
    //categoryValue?: string, 
    //format?: string
 ): ProductData {
-   const now = dayjs().toISOString();
+   const now = nowIso();
    /*
    const category = categoryValue 
       ? ({ main: categoryValue, format } as ProdCategory) 
@@ -119,7 +120,6 @@ export function buildDummyProduct(
    return {
       prodName: `${process} ${powerA}A (manual)`,
       brand,
-      series: '',
       category: defaultCategory(process),
       technical: [{ 
          field: 'Corrente nominal', 

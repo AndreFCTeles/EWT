@@ -1,5 +1,5 @@
-import { AvailablePowers, Processes, DeviceOrigin } from "@/types/generalTypes";
-import { ProductData } from "@/types/productTypes";
+import type { RatedCurrent, Process, DeviceOrigin } from "./protocolTypes";
+import type { ProductData } from "./productTypes";
 
 
 export type Verdict = 'pass' | 'warn' | 'fail' | 'skipped';
@@ -39,30 +39,39 @@ export type Dut = {
    brand: string;
    series?: string;
    serialno?: string;
-   processes: Processes[];
-   ratedCurrent?: AvailablePowers;     // optional; we’ll fill if we can
-   format?: string;                    // derived from category.format or top-level format
+   processes: Process[];
+   ratedCurrent?: RatedCurrent;
+   format?: string;
    origin: DeviceOrigin;
 };
 
 
 
 export type StepId =
-   | 'login' | 'specs'
-   | 'dut' | 'detectDut'
+   'pickProcedure' 
+   | 'specs' | 'dut' | 'detectDut'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
    | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
    | 'ocv'
-   | `proc:${Processes}:nominals`
-   | `proc:${Processes}:start`
-   | `proc:${Processes}:sweep`
-   | `proc:${Processes}:thermal`
+   | `proc:${Process}:nominals`
+   | `proc:${Process}:start`
+   | `proc:${Process}:sweep`
+   | `proc:${Process}:thermal`
    | `proc:${'MIG' | 'TIG'}:pulse`
    | `proc:${'MIG' | 'TIG'}:gas`
    | 'summary' | 'export';
 
-
-
+export const PIPELINE: StepId[] = [
+   'pickProcedure',
+   'specs', 'dut', 'detectDut', 
+   'pickProcess', 'pickPower', 'pickBrand',
+   'interlocks', 'connections', 'selftests', 'calstatus',
+   'ocv',
+   'proc:MIG:nominals', 'proc:MIG:start', 'proc:MIG:sweep', 'proc:MIG:pulse', 'proc:MIG:thermal', 'proc:MIG:gas',
+   'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
+   'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',
+   'summary', 'export'
+];
 
 
 export type StepRecord = {
@@ -84,7 +93,7 @@ export type Submission = {
       appVer: string; 
       templateVer: string; 
    };
-   dut: Dut;
+   dut?: Dut;
    instruments: { 
       meterId: string; 
       meterCal: string; 
@@ -97,9 +106,9 @@ export type Submission = {
    };
    steps: StepRecord[];
    vars?: {
-      manualSelect?: boolean;         // set true if auto-detect failed
-      selectedProcess?: Processes;
-      powerA?: AvailablePowers;
+      manualSelect?: boolean;
+      selectedProcess?: Process;
+      powerA?: RatedCurrent;
       brand?: string;
       productData?: ProductData;
       dutPatchedManual?: boolean;
@@ -108,31 +117,3 @@ export type Submission = {
    finalVerdict?: Verdict;
    reportId?: string;
 };
-
-
-export const PIPELINE: StepId[] = [
-   'login', 'specs',
-   'dut', 'detectDut', 
-   'pickProcess', 'pickPower', 'pickBrand',
-   'interlocks', 'connections', 'selftests', 'calstatus',
-   'ocv',
-   'proc:MIG:nominals', 'proc:MIG:start', 'proc:MIG:sweep', 'proc:MIG:pulse', 'proc:MIG:thermal', 'proc:MIG:gas',
-   'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
-   'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',
-   'summary', 'export'
-];
-
-export const SKIP: (s: Submission) => Partial<Record<StepId, boolean>> = (s) => ({
-   // Skip whole process groups if DUT doesn’t claim them
-   'proc:MIG:nominals': !s.dut.processes.includes('MIG'),
-   'proc:MIG:start': !s.dut.processes.includes('MIG'),
-   'proc:MIG:sweep': !s.dut.processes.includes('MIG'),
-   'proc:MIG:pulse': !s.dut.processes.includes('MIG'), // or only if MIG has pulse in spec
-   'proc:MIG:thermal': !s.dut.processes.includes('MIG'),
-   'proc:MIG:gas': !s.dut.processes.includes('MIG'),
-
-   'proc:TIG:gas': false,  // maybe TIG gas only if spec says gas present
-
-   // Skip VRD check if model has no VRD (handled inside OCV step or with a separate step)
-   // Skip “pulse” where model lacks pulse mode, etc.
-});

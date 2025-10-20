@@ -1,19 +1,19 @@
 import type { ProductData, Category } from '@/types/productTypes'; // shared or codegen
 
 export async function fetchProducts(baseUrl: string): Promise<ProductData[]> {
-   const r = await fetch(`${baseUrl}/epm/getProducts`);
+   const r = await fetch(`${baseUrl}/api/epm/getProducts`);
    const j = await r.json();
    return j.products ?? [];
 }
 
 export async function fetchCategories(baseUrl: string): Promise<Category[]> {
-   const r = await fetch(`${baseUrl}/epm/getCategoriesMongoose`); // preferred per your backend
+   const r = await fetch(`${baseUrl}/api/epm/getCategoriesMongoose`); // preferred per your backend
    const j = await r.json();
    return j.categories ?? [];
 }
 
 export async function fetchUniqueSeries(baseUrl: string): Promise<Array<{label:string; value:string}>> {
-   const r = await fetch(`${baseUrl}/epm/getUniqueSeries`);
+   const r = await fetch(`${baseUrl}/api/epm/getUniqueSeries`);
    const j = await r.json();
    return j.seriesData ?? [];
 }

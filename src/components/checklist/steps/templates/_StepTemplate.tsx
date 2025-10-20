@@ -3,7 +3,7 @@ import { Button, Group, Text } from '@mantine/core';
 import dayjs from '@/lib/dayjs-setup';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import { StepShell } from '@checklist/steps/StepShell';
+import { StepShell } from '@/components/checklist/StepShell';
 
 
 

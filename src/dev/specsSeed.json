@@ -1,0 +1,32 @@
+[
+   {
+      "id": "electrex-mig-basic-s4-300",
+      "model": "MIG BASIC S4 300",
+      "version": "2025-10-01",
+      "processes": ["MIG"],
+      "ocv": {
+         "enabled": true,
+         "channel": "U2",
+         "measureTimeoutMs": 2000,
+         "range": { "min": 78.0, "max": 94.5, "unit": "V" }
+      },
+      "connections": { "enabled": true, "polarityOkName": "polarity_ok", "allowAdminOverride": true },
+      "interlocks": { "enabled": true, "required": ["emergency_ok", "fan_ok"], "stableForMs": 1000 },
+      "notes": "Ranges based on TFL MIG BASIC S4 procedures."
+   },
+   {
+      "id": "electrex-dc-s4-400",
+      "model": "DC S4 400",
+      "version": "2025-10-01",
+      "processes": ["MMA", "TIG"],
+      "ocv": {
+         "enabled": true,
+         "channel": "U2",
+         "measureTimeoutMs": 2000,
+         "range": { "target": 13.0, "tol": { "abs": 1.0 }, "unit": "V" }
+      },
+      "connections": { "enabled": true, "polarityOkName": "polarity_ok", "allowAdminOverride": true },
+      "interlocks": { "enabled": true, "required": ["emergency_ok", "fan_ok"], "stableForMs": 1000 },
+      "notes": "Includes LIFTIG/MMA checks per DC S4 TFL; OCV example for TIG lift measurement."
+   }
+]

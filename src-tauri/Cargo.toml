@@ -28,5 +28,6 @@ chrono = { version = "0.4.42", features = ["serde"] }
 calamine = { version = "0.31.0", features = ["dates"] }     # read .xlsx/.xls/.ods
 rust_xlsxwriter = "0.90.2"                                  # write .xlsx (pure Rust)
 sysinfo = "0.37.1"
+serialport = "4.8.1"
 tokio = { version = "1.47.1", features = ["time"] }
 anyhow = "1.0.100"

@@ -8,14 +8,21 @@ import type { StepId } from '@/types/checklistTypes';
 // Steps
 import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPickSteps';
 import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
+import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
 import { DetectDutStep } from '@steps/DetectDutStep';
 
 
 
+
+
+
+
+
 // Script
-export const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
-   login:                  SkipStep,        // stub
+const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
+   //login:                SkipStep,            // stub
+   pickProcedure:          ProcedurePickerStep,
 
    specs:                  SkipStep,
    dut:                    SkipStep,
@@ -53,3 +60,5 @@ export const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
    export:                 ExportStep,
 
 };
+
+export default StepRegistry;

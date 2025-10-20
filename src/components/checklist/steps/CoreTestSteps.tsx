@@ -2,15 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Button, Group, List, Text, Alert } from '@mantine/core';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import type  { Polarity } from '@/types/checklistTypes';
-import { StepShell } from './StepShell';
+import { StepShell } from '@checklist/StepShell';
 import { 
    verdictFromRanges, 
    pctTolerance, 
    absTolerance 
 } from '@utils/measurement';
-import { signals } from '@utils/hardware'; 
+import { getSpecForDut } from '@utils/specsRepo';
 import { nowIso } from '@utils/generalUtils';
+import { signals } from '@utils/hardware'; 
+import { judge } from '@utils/verdict';
+
+import type { Polarity, Verdict } from '@/types/checklistTypes';
+import type { RangeSpec } from '@/types/specsTypes';
+
+
 
 
 
@@ -25,40 +31,69 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
    isActive, 
    complete, 
    abort,
+   submission 
 } ) => {
-   const [state, setState] = useState({
+   const [encState, setEncState] = useState({
       enclosureClosed: false,
       eStopReleased: false,
       gasOk: true,
       coolantOk: true,
       mainsOk: true,
    });
+   const [enabled, setEnabled] = useState<boolean>(true);
+
+
+   
+   useEffect(() => {
+      getSpecForDut({ dut: submission.dut }).then(s => setEnabled(s?.interlocks?.enabled !== false)).catch(() => setEnabled(true));
+   }, [submission.dut]);
 
    useEffect(() => {
       if (!isActive || alreadyCompleted) return;
-      const unsub = signals.subscribeInterlocks(s => setState(s as any));
+      const unsub = signals.subscribeInterlocks(s => setEncState(s as any));
       return unsub;
    }, [isActive, alreadyCompleted]);
 
-   const allOk = state.enclosureClosed && state.eStopReleased && state.mainsOk !== false;
+   useEffect(() => {
+      if (!isActive || alreadyCompleted) return;
+      if (enabled === false) {
+         complete(
+            { 
+               id, 
+               startedAt: nowIso(), 
+               endedAt: nowIso(), 
+               verdict: 'skipped', 
+               notes: ['Disabled by spec']
+            },
+            { 
+               manualSelect: false
+            }
+      );
+      }
+   }, [enabled, isActive, alreadyCompleted, complete, id]);
+
+
+   const allOk = encState.enclosureClosed && encState.eStopReleased && encState.mainsOk !== false;
 
    useEffect(() => {
       if (!isActive || alreadyCompleted) return;
       if (allOk) {
-         const t = setTimeout(() => complete({
-            id,
-            startedAt: nowIso(),
-            endedAt: nowIso(),
-            measured: {
-               enclosureClosed: Number(state.enclosureClosed),
-               eStopReleased: Number(state.eStopReleased),
-               mainsOk: Number(state.mainsOk ?? 1),
-            },
-            verdict: 'pass',
-         }), 5000);
+         const t = setTimeout(() => complete(
+            {
+               id,
+               startedAt: nowIso(),
+               endedAt: nowIso(),
+               measured: {
+                  enclosureClosed: Number(encState.enclosureClosed),
+                  eStopReleased: Number(encState.eStopReleased),
+                  mainsOk: Number(encState.mainsOk ?? 1),
+               },
+               verdict: 'pass',
+            }//,{ manualSelect: false }
+         ), 5000);
          return () => clearTimeout(t);
       }
-   }, [allOk, isActive, alreadyCompleted, complete, id, state]);
+   }, [allOk, isActive, alreadyCompleted, complete, id, encState]);
 
    return (
       <StepShell
@@ -68,9 +103,9 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
       right={!allOk && !alreadyCompleted && <Text c="red">Waiting…</Text>}
       >
          <List>
-            <List.Item>Enclosure: {state.enclosureClosed ? 'Closed' : 'Open'}</List.Item>
-            <List.Item>E-Stop: {state.eStopReleased ? 'Released' : 'Pressed'}</List.Item>
-            <List.Item>Mains: {state.mainsOk ? 'OK' : 'Out of window'}</List.Item>
+            <List.Item>Enclosure: {encState.enclosureClosed ? 'Closed' : 'Open'}</List.Item>
+            <List.Item>E-Stop: {encState.eStopReleased ? 'Released' : 'Pressed'}</List.Item>
+            <List.Item>Mains: {encState.mainsOk ? 'OK' : 'Out of window'}</List.Item>
          </List>
          {!allOk && !alreadyCompleted && (
             <Group mt="md">
@@ -85,15 +120,35 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
    );
 };
 
+
+
+
+
+
+
+
+
 // ---------- Connections ----------
 export const ConnectionsStep: React.FC<StepRuntimeProps> = ( { 
    id, 
    complete, 
    role, 
    abort, 
-   isActive 
+   isActive,
+   submission
 } ) => {
    const [polarity, setPolarity] = useState<Polarity>('unknown');
+   const [allowOverride, setAllowOverride] = useState<boolean>(false);//(role === 'admin' || role === 'superadmin');
+
+
+   
+   useEffect(() => {
+      getSpecForDut({ dut: submission.dut }).then(s => 
+         setAllowOverride(s?.connections?.allowAdminOverride ?? (role === 'admin' || role === 'superadmin'))
+      )
+   .catch(() => setAllowOverride(role === 'admin' || role === 'superadmin'));
+   }, [submission.dut, role]);
+
 
    useEffect(() => {
       if (!isActive) return;
@@ -101,17 +156,19 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
       return unsub;
    }, [isActive]);
 
-   const canProceed = polarity === 'ok' || (role === 'admin' && polarity !== 'open');
+   const canProceed = polarity === 'ok' || (allowOverride && polarity !== 'open');
 
    const onNext = () => {
-      complete({
-         id,
-         startedAt: nowIso(),
-         endedAt: nowIso(),
-         measured: { polarityOk: Number(polarity === 'ok') },
-         verdict: polarity === 'ok' ? 'pass' : 'warn',
-         notes: polarity === 'ok' ? [] : [`Polarity = ${polarity}`],
-      });
+      complete(
+         {
+            id,
+            startedAt: nowIso(),
+            endedAt: nowIso(),
+            measured: { polarityOk: Number(polarity === 'ok') },
+            verdict: polarity === 'ok' ? 'pass' : 'warn',
+            notes: polarity === 'ok' ? [] : [`Polarity = ${polarity}`],
+         }//,{ manualSelect: false }
+      );
    };
 
    return (
@@ -130,10 +187,32 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
    );
 };
 
+
+
+
+
+
+
+
+
+
+
+
 // ---------- OCV ----------
-export const OcvStep: React.FC<StepRuntimeProps> = ({ id, complete, isActive }) => {
+export const OcvStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   complete, 
+   submission, 
+   isActive 
+} ) => {
    const [reading, setReading] = useState<number | null>(null);
+   const [range, setRange] = useState<RangeSpec | null>(null);
    const target = 80; // TODO: populate from specs/submission
+
+   
+   useEffect(() => {
+      getSpecForDut({ dut: submission.dut }).then(s => setRange(s?.ocv?.enabled ? s.ocv.range : null)).catch(() => setRange(null));
+   }, [submission.dut]);
 
    const onMeasure = async () => {
       if (!isActive) return;
@@ -144,38 +223,51 @@ export const OcvStep: React.FC<StepRuntimeProps> = ({ id, complete, isActive }) 
    const onConfirm = () => {
       if (reading == null) return;
 
-      // Combine abs ±2.0V AND pct ±3% into a tighter intersection
-      const passAbs = absTolerance(target, 2.0);
-      const passPct = pctTolerance(target, 3);
-      const passRange = { 
-         min: Math.max(passAbs.min, passPct.min), 
-         max: Math.min(passAbs.max, passPct.max) 
-      };
-      const verdict = verdictFromRanges(reading, passRange);
+      // Combine abs ±2.0V AND pct ±3% into a tighter intersection    
+      // Prefer spec window, else your existing abs+pct intersection
+      let verdictStr: Verdict;
+      let notes: string[] | undefined;
+      if (range) {
+         const v = judge(reading, range);
+         verdictStr = v.pass ? 'pass' : 'fail';
+         notes = v.pass ? undefined : [`OCV ${v.reason} (value=${v.value}, min=${v.min}, max=${v.max})`];
+      } else {
+         const passAbs = absTolerance(target, 2.0);
+         const passPct = pctTolerance(target, 3);
+         const passRange = { 
+            min: Math.max(passAbs.min, passPct.min), 
+            max: Math.min(passAbs.max, passPct.max) 
+         };
+         const verdict = verdictFromRanges(reading, passRange);
+         verdictStr = verdict; // 'pass' | 'fail' from your helper
+      }
 
-      complete({
-         id,
-         startedAt: nowIso(),
-         endedAt: nowIso(),
-         commanded: { state: 'no-load' },
-         measured: { ocv: reading },
-         toleranceUsed: { 
-            abs: 2.0, 
-            pct: 3, 
-            combo: 'intersection' 
-         },
-         verdict,
-      });
+      complete(
+         {
+            id,
+            startedAt: nowIso(),
+            endedAt: nowIso(),
+            commanded: { state: 'no-load' },
+            measured: { ocv: reading },
+            toleranceUsed: { 
+               abs: 2.0, 
+               pct: 3, 
+               combo: 'intersection' 
+            },
+            verdict: verdictStr,
+            notes,
+         }//,{ manualSelect: false }
+      );
    };
 
    return (
       <StepShell title="OCV / VRD">
          <Group>
-            <Button onClick={onMeasure} disabled={!isActive}>Measure OCV</Button>
+            <Button fullWidth onClick={onMeasure} disabled={!isActive}>Measure OCV</Button>
             {reading != null && <Text>Reading: {reading.toFixed(2)} V (Target {target} V)</Text>}
          </Group>
          <Group mt="md">
-            <Button onClick={onConfirm} disabled={reading == null}>Confirm</Button>
+            <Button fullWidth onClick={onConfirm} disabled={reading == null}>Confirm</Button>
          </Group>
       </StepShell>
    );

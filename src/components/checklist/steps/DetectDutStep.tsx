@@ -16,25 +16,29 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
          const probe = await probeConnectedDut();
          if (!probe.connected) {
             // Not connected → force manual selection
-            return complete({
-               id, 
-               startedAt, 
-               endedAt: nowIso(),
-               verdict: 'warn', 
-               notes: ['DUT not connected'],
-            }, { manualSelect: true });
+            return complete(
+               {
+                  id, 
+                  startedAt, 
+                  endedAt: nowIso(),
+                  verdict: 'warn', 
+                  notes: ['DUT not connected'],
+               }// , { manualSelect: true }
+            );
          }
 
          const dbproduct = probe.hwId ? await lookupProductByHwId(probe.hwId) : null;
          if (!dbproduct) {
             // Connected but unknown → manual selection
-            return complete({
-               id, 
-               startedAt, 
-               endedAt: nowIso(),
-               verdict: 'warn', 
-               notes: ['DUT not found in DB'],
-            }, { manualSelect: true });
+            return complete(
+               {
+                  id, 
+                  startedAt, 
+                  endedAt: nowIso(),
+                  verdict: 'warn', 
+                  notes: ['DUT not found in DB'],
+               }// , { manualSelect: true }
+            );
          }
 
          const dut = productToDut(dbproduct, 'db');
@@ -44,7 +48,7 @@ export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, comple
             endedAt: nowIso(), 
             verdict: 'pass' 
          },{ 
-            manualSelect: false, 
+            // manualSelect: false, 
             productData: dbproduct, 
             dut 
          });

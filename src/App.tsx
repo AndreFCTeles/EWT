@@ -47,34 +47,6 @@ import { getInitialSubmission } from './dev/bootstrap';
 
 
 
-/*
-const initialSubmission: Submission = {
-   header: { 
-      operator: 'demo', 
-      station: 'S1', 
-      appVer: '0.1.0', 
-      templateVer: '2025-09-19' 
-   },
-   dut: { 
-      prodName: 'MIG 604 CW', 
-      brand: 'ELECTREX',
-      series: '4',
-      serialno: 'N/D', 
-      ratedCurrent: 600,
-      processes: ['MIG'],
-      origin: 'db'
-   },
-   instruments: { 
-      meterId: 'FLUKE-1', 
-      meterCal: '2025-01-01', 
-      lbId: 'N/D' 
-   },
-   steps: [],
-};
-*/
-
-
-
 
 
 
@@ -83,10 +55,10 @@ const App: React.FC  = () => {
 
    /* |--- STATES ---| */
    // Autenticação e níveis de acesso
-   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------- Mostra modal de login
-   const [isLoggedIn, setIsLoggedIn] = useState(true); // -------------------------------------- Ativa/muda elementos UI após login
+   const [showLoginModal, setShowLoginModal] = useState(true); // ------------------------------- Mostra modal de login
+   const [isLoggedIn, setIsLoggedIn] = useState(false); // -------------------------------------- Ativa/muda elementos UI após login
    const [authUser, setAuthUser] = useState<CredentialSafe>(); // ------------------------------- Muda acesso a funcionalidades consoante autorização de login
-   const [role, setRole] = useState<Role>('admin');//('not_logged');
+   const [role, setRole] = useState<Role>('not_logged');//('admin');
 // const roleRank: Record<Role, number> = { user: 0, admin: 1, superadmin: 2 }; // -------------- Nível de acesso
    const [authBooting, setAuthBooting] = useState(true); // ------------------------------------- Auto-login
    //const [showChangePw, setShowChangePw] = useState(false); // -------------------------------- Comportamento de modal de mudança de password
@@ -94,6 +66,18 @@ const App: React.FC  = () => {
       useState<boolean>(() => {
          return localStorage.getItem(LS_KEEP) === '1';
       });
+   // Component management & nav
+   //const [submission, setSubmission] = useState<Submission>(initialSubmission);
+   const [submission, setSubmission] = useState<Submission>(() => getInitialSubmission());
+   // UI/UX Basics
+   const [navOpened, { toggle: toggleNav, close: closeNav }] = useDisclosure(false);
+   const isAdmin = role === 'admin' || role === 'superadmin';
+   const isAuth = isLoggedIn && role !== 'not_logged';
+   const canShowNav = isAuth && isAdmin && navOpened;
+   const { setColorScheme } = useMantineColorScheme({ keepTransitions: true });
+   const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
+   const isDark = computed === 'dark';
+   const [uiView, setUiView] = useState<UIVIEW>('basic');
    // Sistema de Notificações
    /*
    const [notification, setNotification] = useState<{
@@ -117,15 +101,6 @@ const App: React.FC  = () => {
       setTimeout(() => { setNotification((prevState) => ({ ...prevState, visible: false })); }, 5000);
    }, []);
    */
-   // Component management & nav
-   //const [submission, setSubmission] = useState<Submission>(initialSubmission);
-   const [submission, setSubmission] = useState<Submission>(() => getInitialSubmission());
-   // UI/UX Basics
-   const [navOpened, { toggle: toggleNav }] = useDisclosure();
-   const { setColorScheme } = useMantineColorScheme({ keepTransitions: true });
-   const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
-   const isDark = computed === 'dark';
-   const [uiView, setUiView] = useState<UIVIEW>('basic');
    // DayJS
    const date = dayjs().format('DD/MM/YYYY');
 
@@ -148,9 +123,12 @@ const App: React.FC  = () => {
       setAuthUser(undefined);
       setIsLoggedIn(false);
       setPersistLogin(false);
+      setUiView('basic');
       localStorage.removeItem(LS_KEEP);
       localStorage.removeItem(LS_AUTH);
+      setRole('not_logged');
       setShowLoginModal(true);
+      closeNav();      
       //setShowChangePw(false);
    }, []);
 
@@ -201,11 +179,11 @@ const App: React.FC  = () => {
       transitionDuration={500}
       header={{height: 50}}
       navbar={{ 
-         width: navOpened&&isLoggedIn ? 320 : 0, 
+         width: 320, //navOpened&&isLoggedIn ? 320 : 0, 
          breakpoint: 'sm',
          collapsed: {
-            mobile: !navOpened&&!isLoggedIn, 
-            desktop: !navOpened&&!isLoggedIn
+            mobile: !canShowNav, 
+            desktop: !canShowNav
          }
       }}
       footer={{height: 50}}
@@ -215,16 +193,18 @@ const App: React.FC  = () => {
 
 
          <Transition 
-         mounted={navOpened} 
+         mounted={canShowNav} 
          transition={"scale-x"}
          duration={500}
          >
             {(transitionStyle) => (
-               <AppShell.Navbar p={navOpened&&isLoggedIn ? "sm" : 0} style={{ ...transitionStyle}} >
-                  {navOpened&&isLoggedIn && ( 
+               <AppShell.Navbar 
+               py={"sm"} 
+               px={canShowNav ? "sm" : 0} 
+               style={{ ...transitionStyle}} >
+                  {canShowNav && ( 
                      <Flex 
                      direction={'column'} 
-                     w={"100%"} 
                      h={"100%"} 
                      justify={"space-between"} 
                      align={'center'} 
@@ -233,10 +213,15 @@ const App: React.FC  = () => {
                         <AdminHUD 
                         submission={submission} 
                         importstyle={transitionStyle} 
+                        uiView={uiView}
                         user={authUser?.nome} />
 
                         <Button 
                         fullWidth
+                        variant='subtle'
+                        mah={"40px"}
+                        mih={"40px"}
+                        mt={'md'}
                         onClick={()=>{ 
                            console.log('toggle adminview'); 
                            setUiView(uiView==='basic'?'advanced':'basic')
@@ -249,36 +234,33 @@ const App: React.FC  = () => {
 
 
          <AppShell.Header>
-            { (role!=='not_logged') && 
+            { isAuth && 
                <Flex 
                w={"100%"} 
                h={"100%"} 
-               justify={"space-between"} 
+               justify={isAdmin? "space-between" : "right"} 
                align={'center'} 
                px={'xl'} 
                py={0} 
                m={0}>
                   {/* put a role toggle for dev */}
-                  <span 
-                  style={{ cursor: 'pointer' }} 
-                  onClick={
-                     (role === 'admin'||'superadmin') 
-                     ? toggleNav 
-                     : ()=>{}
-                  }>Role: <b>{role}</b></span>
+                  {isAdmin && (
+                     <span 
+                     style={{ cursor: 'pointer' }} 
+                     onClick={ toggleNav }>
+                        Role: <b>{role}</b>
+                     </span>
+                  )}
 
-               <Button onClick={()=>{
-                  handleLogout();
-                  setRole('not_logged');
-                  !navOpened;
-               }}>logout</Button>
-            </Flex>}
+                  <Button onClick={handleLogout}>logout</Button>
+               </Flex>
+            }
          </AppShell.Header>
 
 
          <AppShell.Main>
             {/* renderComponent() */}
-            <Container fluid py="md" mih={"100%"}>
+            <Container fluid py="md" mih={"100%"} h={100}>
                <ChecklistController
                role={role}
                submission={submission}

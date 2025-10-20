@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Button, Group, Loader, ScrollArea, Stack, Text } from '@mantine/core';
 
-import { StepShell } from './StepShell';
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import type { AvailablePowers, Processes } from '@/types/generalTypes';
+import { StepShell } from '@checklist/StepShell';
+//import type { AvailablePowers, Processes } from '@/types/generalTypes';
+import type { RatedCurrent, Process } from '@/types/protocolTypes';
+
 import { fetchBrands } from '@/services/api/epmApi';
 import { nowIso } from '@utils/generalUtils';
 import { API_URL } from '@/lib/config';
@@ -14,14 +16,14 @@ import { API_URL } from '@/lib/config';
 
 
 
-const PROCESSES: Processes[] = ['MIG', 'TIG', 'MMA'];
-const POWERS: AvailablePowers[] = [300, 400, 500, 600];
+const PROCESSES: Process[] = ['MIG', 'TIG', 'MMA'];
+const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000 ];
 
 
 
 // ---- PickProcess ----
 export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
-   const pick = (p: Processes) => {
+   const pick = (p: Process) => {
       const now = nowIso();
       complete(
          { 
@@ -32,7 +34,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
             verdict: 'pass' 
          },
          { 
-            manualSelect: true, 
+            // manualSelect: true, 
             selectedProcess: p 
          }
       );
@@ -59,7 +61,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
 
 // ---- PickPower ----
 export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
-   const pick = (a: AvailablePowers) => {
+   const pick = (a: RatedCurrent) => {
       const now = nowIso();
       complete(
          { 
@@ -70,7 +72,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
             verdict: 'pass' 
          },
          { 
-            manualSelect: true, 
+            // manualSelect: true, 
             powerA: a 
          }
       );
@@ -123,7 +125,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
             verdict: 'pass' 
          },
          { 
-            manualSelect: true, 
+            // manualSelect: true, 
             brand: brandName 
          }
       );

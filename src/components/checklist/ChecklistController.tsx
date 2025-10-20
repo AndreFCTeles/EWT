@@ -1,13 +1,14 @@
-import { useState,  useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Loader, Text } from '@mantine/core';
 
-import { REGISTRY, shouldSkip, wasCompleted, StepRuntimeProps } from './pipeline';
-import { buildDummyProduct, dummyToDut } from '@utils/dut';
+import { REGISTRY, wasCompleted, StepRuntimeProps } from './pipeline'; 
+import SkipStep from './SkipStep';
+
 import { nowIso } from '@utils/generalUtils';
 import { buildReport } from '@utils/report';
 
 import { Submission, StepId, StepRecord, PIPELINE } from '@/types/checklistTypes'; 
-import { Role } from '@/types/generalTypes';
+import type { Role } from '@/types/generalTypes';
 
 
 
@@ -23,23 +24,31 @@ export function ChecklistController({
    role, 
    submission, 
    setSubmission, 
-   //jumpTo = null 
+   jumpTo = null 
 }: Props) {
    const [idx, setIdx] = useState(0);
    const activeId = PIPELINE[idx];
 
 
-   const nextIndexWith = useCallback((i: number, s: Submission) => {//, s: Submission
-      let j = i + 1;
-      while (j < PIPELINE.length && shouldSkip(PIPELINE[j], s)) {
-         console.log('Skipping', PIPELINE[j]);
-         j++;
-      } // se tirar console.log, apenas j++;
-      //return Math.min(j, PIPELINE.length - 1);
+   useEffect(()=>{
+      console.log(`Current: ${idx} - ${activeId}`)
+   }, [idx, activeId]);
+
+   // Optional external jump support
+   useEffect(() => {
+      if (!jumpTo) return;
+      const j = PIPELINE.indexOf(jumpTo);
       
-      console.log('Next index =', j, '->', PIPELINE[j]);
-      return j;
-   }, []); 
+      console.log(`"Jumped to Step: "${j}", "${jumpTo}"`);
+
+      if (j >= 0) setIdx(j);
+   }, [jumpTo]);
+
+
+   const nextIndexWith = useCallback((id: number) => {      
+      console.log(`Next Step: "${id}"`);
+      return Math.min(id + 1, PIPELINE.length - 1);
+   }, []);
 
    const prevCompletedIndex = useMemo(() => {
       let j = idx - 1;
@@ -53,69 +62,45 @@ export function ChecklistController({
 
    const goBack = useCallback(() => {
       if (prevCompletedIndex >= 0) setIdx(prevCompletedIndex);
+      console.log(`Returned to Step: "${prevCompletedIndex}"`);
    }, [prevCompletedIndex]);
 
    
    
    
    
-   // --- The heart: complete() builds the *next* submission first, then advances using that state ---
+   // construir "submission" para relatório, finalizar processos de step
    const complete = (record: StepRecord, patchVars?: Record<string, any>) => {
-      // merge vars first
       const mergedVars = { ...(submission.vars ?? {}), ...(patchVars ?? {}) };
+      // honor an explicit dut in patchVars, but NEVER synthesize or infer here
+      const dut = mergedVars.dut ?? submission.dut;
 
-      // take current dut (may be undefined on first steps)
-      let dut = submission.dut;
-
-      // 1) If a step passed a dut (e.g., DetectDut), trust it
-      if (mergedVars.dut) { dut = mergedVars.dut; }
-
-
-      // 2) Manual path: if we have all picks, synthesize ProductData + DUT once
-      const haveAllManual =
-         mergedVars.manualSelect &&
-         !!mergedVars.selectedProcess &&
-         !!mergedVars.powerA &&
-         !!mergedVars.brand;
-
-      if (haveAllManual && !dut && !mergedVars.dutPatchedManual) {
-         const dummyProduct = buildDummyProduct(
-            mergedVars.selectedProcess!,
-            mergedVars.powerA!,
-            mergedVars.brand!
-         );
-         mergedVars.productData = dummyProduct; // keep full ProductData for export/report
-         mergedVars.dutPatchedManual = true;    // guard so we don't rebuild on minor edits
-         dut = dummyToDut(dummyProduct);        // small runtime DUT used by pipeline skip rules
-      }
-
-      // 3) Record keeping (replace if already present)
+      // Record keeping (replace if already present)
       const already = wasCompleted(submission, record.id);
       const steps = already
          ? submission.steps.map(s => (s.id === record.id ? record : s))
          : [...submission.steps, record];
 
-      // 4) Build the *new* submission object
+      // Build submission object
       const nextSub: Submission = {
          ...submission,
          steps,
-         vars: mergedVars, // ⬅️ use the merged vars we built above (don’t rebuild here)
+         vars: mergedVars, 
          dut,
       };
 
-      // 5) Compute report at summary time (optional early compute)
+      
+      // Optionally compute report when the 'summary' step completes
       if (record.id === 'summary') {
-         setSubmission(buildReport(nextSub));
-         // advance using *nextSub* so skips reflect the computed report if needed
-         const j = nextIndexWith(idx, buildReport(nextSub));
-         if (j < PIPELINE.length) setIdx(j);
+         const built = buildReport(nextSub);
+         setSubmission(built);
+         setIdx(nextIndexWith(idx));
          return;
       }
 
-      // 6) Commit new submission, then advance using *nextSub* (fresh state)
+      // Commit new submission, advance using *nextSub*
       setSubmission(nextSub);
-      const j = nextIndexWith(idx, nextSub);
-      if (j < PIPELINE.length) setIdx(j);
+      setIdx(nextIndexWith(idx));
    };
 
    const abort = (reason: string) => {
@@ -131,7 +116,7 @@ export function ChecklistController({
       setIdx(summaryIndex >= 0 ? summaryIndex : idx);
    };
 
-   const StepComp = REGISTRY[activeId];
+   const StepComp = REGISTRY[activeId] ?? SkipStep; // fallback se step não estiver implementado
    if (!StepComp) {
       return (
          <Card withBorder p="md">
@@ -144,7 +129,7 @@ export function ChecklistController({
    const runtimeProps: StepRuntimeProps = {
       id: activeId,
       role,
-      isActive: true,             // admin overview uses false for non-active
+      isActive: true,
       alreadyCompleted: wasCompleted(submission, activeId),
       goBack,
       canGoBack: prevCompletedIndex >= 0,
