@@ -10,6 +10,7 @@ import App from "./App";
 
 // Estilos
 import '@mantine/core/styles.css';
+import '@mantine/notifications/styles.css';
 import "./styles/App.css";
 import "./styles/styles.css";
 

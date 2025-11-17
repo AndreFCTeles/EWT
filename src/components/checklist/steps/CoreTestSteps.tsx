@@ -45,32 +45,48 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
 
    
    useEffect(() => {
-      getSpecForDut({ dut: submission.dut }).then(s => setEnabled(s?.interlocks?.enabled !== false)).catch(() => setEnabled(true));
+      getSpecForDut({ dut: submission.dut })
+         .then(s => setEnabled(s?.interlocks?.enabled !== false))
+         .catch(() => setEnabled(true));
    }, [submission.dut]);
+   /*
+   useEffect(() => {
+      let alive = true;
+      getSpecForDut({ dut: submission.dut })
+         .then((s) => alive && setEnabled(s?.interlocks?.enabled !== false))
+         .catch(() => alive && setEnabled(true));
+      return () => {
+         alive = false;
+      };
+   }, [submission.dut]);
+   */
 
    useEffect(() => {
       if (!isActive || alreadyCompleted) return;
       const unsub = signals.subscribeInterlocks(s => setEncState(s as any));
       return unsub;
    }, [isActive, alreadyCompleted]);
+   /*
+   useEffect(() => {
+      if (!isActive || alreadyCompleted) return;
+      const unsub = signals.subscribeInterlocks((s) => setEncState(s as any));
+      return () => { unsub?.(); };
+   }, [isActive, alreadyCompleted]);
+   */
 
    useEffect(() => {
       if (!isActive || alreadyCompleted) return;
       if (enabled === false) {
-         complete(
-            { 
-               id, 
-               startedAt: nowIso(), 
-               endedAt: nowIso(), 
-               verdict: 'skipped', 
-               notes: ['Disabled by spec']
-            },
-            { 
-               manualSelect: false
-            }
-      );
+         complete({
+            id,
+            startedAt: nowIso(),
+            endedAt: nowIso(),
+            verdict: 'skipped',
+            notes: ['Disabled by spec'],
+         },{});
       }
    }, [enabled, isActive, alreadyCompleted, complete, id]);
+
 
 
    const allOk = encState.enclosureClosed && encState.eStopReleased && encState.mainsOk !== false;
@@ -89,7 +105,7 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
                   mainsOk: Number(encState.mainsOk ?? 1),
                },
                verdict: 'pass',
-            }//,{ manualSelect: false }
+            }
          ), 5000);
          return () => clearTimeout(t);
       }
@@ -138,7 +154,7 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
    submission
 } ) => {
    const [polarity, setPolarity] = useState<Polarity>('unknown');
-   const [allowOverride, setAllowOverride] = useState<boolean>(false);//(role === 'admin' || role === 'superadmin');
+   const [allowOverride, setAllowOverride] = useState<boolean>(false);
 
 
    
@@ -167,7 +183,7 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
             measured: { polarityOk: Number(polarity === 'ok') },
             verdict: polarity === 'ok' ? 'pass' : 'warn',
             notes: polarity === 'ok' ? [] : [`Polarity = ${polarity}`],
-         }//,{ manualSelect: false }
+         }
       );
    };
 
@@ -239,7 +255,7 @@ export const OcvStep: React.FC<StepRuntimeProps> = ( {
             max: Math.min(passAbs.max, passPct.max) 
          };
          const verdict = verdictFromRanges(reading, passRange);
-         verdictStr = verdict; // 'pass' | 'fail' from your helper
+         verdictStr = verdict; // 'pass' | 'fail'
       }
 
       complete(
@@ -256,7 +272,7 @@ export const OcvStep: React.FC<StepRuntimeProps> = ( {
             },
             verdict: verdictStr,
             notes,
-         }//,{ manualSelect: false }
+         }
       );
    };
 
@@ -264,7 +280,7 @@ export const OcvStep: React.FC<StepRuntimeProps> = ( {
       <StepShell title="OCV / VRD">
          <Group>
             <Button fullWidth onClick={onMeasure} disabled={!isActive}>Measure OCV</Button>
-            {reading != null && <Text>Reading: {reading.toFixed(2)} V (Target {target} V)</Text>}
+            {reading != null && <Text>Leitura: {reading.toFixed(2)} V (Target {target} V)</Text>}
          </Group>
          <Group mt="md">
             <Button fullWidth onClick={onConfirm} disabled={reading == null}>Confirm</Button>

@@ -3,7 +3,6 @@ import { Button, Group, Loader, ScrollArea, Stack, Text } from '@mantine/core';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
-//import type { AvailablePowers, Processes } from '@/types/generalTypes';
 import type { RatedCurrent, Process } from '@/types/protocolTypes';
 
 import { fetchBrands } from '@/services/api/epmApi';
@@ -17,7 +16,7 @@ import { API_URL } from '@/lib/config';
 
 
 const PROCESSES: Process[] = ['MIG', 'TIG', 'MMA'];
-const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000 ];
+const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
 
 
 
@@ -34,7 +33,6 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
             verdict: 'pass' 
          },
          { 
-            // manualSelect: true, 
             selectedProcess: p 
          }
       );
@@ -42,7 +40,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
 
    return (
       <StepShell 
-      title="Select Process" 
+      title="Selecione o processo de soldadura" 
       canGoBack={canGoBack} 
       onBack={goBack}>
          <Group mt="xs">
@@ -80,7 +78,6 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
 
    return (
       <StepShell 
-      title="Select Rated Power" 
       canGoBack={canGoBack} 
       onBack={goBack}>
          <Group mt="xs">
@@ -125,7 +122,6 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
             verdict: 'pass' 
          },
          { 
-            // manualSelect: true, 
             brand: brandName 
          }
       );
@@ -133,12 +129,12 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
 
    return (
       <StepShell 
-      title="Select Brand" 
+      title="Selecione a marca do equipamento" 
       canGoBack={canGoBack} 
       onBack={goBack}>
          {loading ? 
             <Stack>
-               <Text size="sm">Loading brands…</Text>
+               <Text size="sm">A carregar marcas…</Text>
                <Loader />
             </Stack> 
          :

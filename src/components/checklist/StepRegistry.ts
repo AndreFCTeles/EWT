@@ -20,17 +20,20 @@ import { DetectDutStep } from '@steps/DetectDutStep';
 
 
 // Script
-const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
-   //login:                SkipStep,            // stub
+export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
+   //login:                SkipStep, //aproveita para detetar api, not rendered, aguarda LoginModal "success"
+
+   detectPowerBank:        SkipStep, //auto
    pickProcedure:          ProcedurePickerStep,
 
-   specs:                  SkipStep,
-   dut:                    SkipStep,
    detectDut:              DetectDutStep,
+   dut:                    SkipStep, // nome dut, form com specs principais
 
    pickProcess:            PickProcessStep,
    pickPower:              PickPowerStep,
    pickBrand:              PickBrandStep,
+
+   specs:                  SkipStep,
 
    interlocks:             InterlocksStep,
    connections:            ConnectionsStep,
@@ -58,7 +61,13 @@ const StepRegistry: Record<StepId, React.FC<StepRuntimeProps>> = {
 
    summary:                SummaryStep,
    export:                 ExportStep,
-
 };
 
-export default StepRegistry;
+
+
+
+export const AUTO_COMPONENTS = new Set<React.FC<StepRuntimeProps>>([
+   SkipStep,
+   DetectDutStep as React.FC<StepRuntimeProps>, // as unknown 
+   InterlocksStep as React.FC<StepRuntimeProps>,
+]);

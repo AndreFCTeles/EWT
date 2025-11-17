@@ -4,6 +4,11 @@
    "windows": ["main"],
    "permissions": [
       "fs:default",
+      "fs:allow-read-text-file",
+      "fs:allow-write-text-file",
+      "fs:allow-exists",
+      "fs:allow-appdata-read",
+      "fs:allow-appdata-write",
       { 
          "identifier": "fs:allow-exists", 
          "allow": [{ "path": "$APPDATA/*" }] 

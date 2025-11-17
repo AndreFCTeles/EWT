@@ -2,7 +2,10 @@ import type { RatedCurrent, Process, DeviceOrigin } from "./protocolTypes";
 import type { ProductData } from "./productTypes";
 
 
-export type Verdict = 'pass' | 'warn' | 'fail' | 'skipped';
+export type Verdict = 
+'pass' | 'warn' | 'fail' | 'skipped' | 
+'OK' | 'aviso' | 'falhou' | 'ignorado' | '-' | 'N/A';
+
 export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
 
 export type ProductDoc = {
@@ -16,7 +19,9 @@ export type ProductDoc = {
       sub?: {
          main: string;
          format?: string;
-         sub?: { main: string };
+         sub?: { 
+            main: string 
+         };
       };
       format?: string;
    };
@@ -48,7 +53,7 @@ export type Dut = {
 
 
 export type StepId =
-   'pickProcedure' 
+   'detectPowerBank' | 'pickProcedure' 
    | 'specs' | 'dut' | 'detectDut'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
    | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
@@ -62,7 +67,7 @@ export type StepId =
    | 'summary' | 'export';
 
 export const PIPELINE: StepId[] = [
-   'pickProcedure',
+   'detectPowerBank', 'pickProcedure',
    'specs', 'dut', 'detectDut', 
    'pickProcess', 'pickPower', 'pickBrand',
    'interlocks', 'connections', 'selftests', 'calstatus',

@@ -17,13 +17,13 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
    ));
 
    return (
-      <StepShell title="Summary">
+      <StepShell title="Conclusão">
          <Table.ScrollContainer minWidth={500}><Table withTableBorder>
             <Table.Thead>
                <Table.Tr>
-                  <Table.Th>Step</Table.Th>
-                  <Table.Th>Verdict</Table.Th>
-                  <Table.Th>Notes</Table.Th>
+                  <Table.Th>Passo</Table.Th>
+                  <Table.Th>Veredito</Table.Th>
+                  <Table.Th>Notas</Table.Th>
                </Table.Tr>
             </Table.Thead>
             <Table.Tbody>{rows}</Table.Tbody>
@@ -36,7 +36,7 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
                   endedAt: nowIso(),
                   verdict: submission.steps.some(s => s.verdict === 'fail') ? 'fail' : 'pass'
                }, { manualSelect: true }
-            )}>Proceed to Export</Button>
+            )}>Proceder à exportação</Button>
          </Group>
       </StepShell>
    );
@@ -64,10 +64,10 @@ export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
    };
 
    return (
-      <StepShell title="Export">
+      <StepShell title="Exportação">
          <Code block style={{ maxHeight: 300, overflow: 'auto' }}>{json}</Code>
          <Group mt="md">
-            <Button onClick={download}>Download JSON</Button>
+            <Button onClick={download}>Descarregar ficheiro</Button>
          </Group>
       </StepShell>
    );

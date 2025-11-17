@@ -77,13 +77,15 @@ function bytesPreviewTable(title: string, data: number[]) {
                      <Table.Td>{b.toString(10)}</Table.Td>
                      <Table.Td>{b.toString(2).padStart(8, "0")}</Table.Td>
                      <Table.Td>
-                        {b >= 0x20 && b <= 0x7e
+                        {
+                           b >= 0x20 && b <= 0x7e
                            ? String.fromCharCode(b)
                            : b === 0x0d
                            ? "␍"
                            : b === 0x0a
                            ? "␊"
-                           : "·"}
+                           : "·"
+                        }
                      </Table.Td>
                   </Table.Tr>
                ))}

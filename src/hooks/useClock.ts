@@ -11,7 +11,7 @@ export default function useClock() {
       let unlisten: (() => void) | undefined;
       let mounted = true;
 
-      
+
       invoke<number>("clock_now")
          .then((ms) => { if (mounted) setNow(ms); })
          .catch(() => { /* ignore; we'll get the first tick soon */ });
@@ -19,7 +19,7 @@ export default function useClock() {
       (async () => {
          console.debug("[clock] subscribing");
          unlisten = await listen<Tick>("clock:tick", ({ payload }) => {
-         if (mounted) setNow(payload.epoch_ms);
+            if (mounted) setNow(payload.epoch_ms);
          });
       })();
       return () => { mounted = false; unlisten?.(); };

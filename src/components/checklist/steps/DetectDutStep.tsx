@@ -9,52 +9,53 @@ import { nowIso } from '@utils/generalUtils';
 export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, complete }) => {
    useEffect(() => {
       if (!isActive) return;
+      let cancelled = false;
 
       (async () => {
          const startedAt = nowIso();
-
          const probe = await probeConnectedDut();
+         if (cancelled) return;
+
          if (!probe.connected) {
-            // Not connected → force manual selection
-            return complete(
-               {
-                  id, 
-                  startedAt, 
-                  endedAt: nowIso(),
-                  verdict: 'warn', 
-                  notes: ['DUT not connected'],
-               }// , { manualSelect: true }
-            );
+            complete({ 
+               id, 
+               startedAt, 
+               endedAt: nowIso(), 
+               verdict: 'warn', 
+               notes: ['DuT não conectado'] 
+            });
+            return;
          }
 
          const dbproduct = probe.hwId ? await lookupProductByHwId(probe.hwId) : null;
+         if (cancelled) return;
+
          if (!dbproduct) {
-            // Connected but unknown → manual selection
-            return complete(
-               {
-                  id, 
-                  startedAt, 
-                  endedAt: nowIso(),
-                  verdict: 'warn', 
-                  notes: ['DUT not found in DB'],
-               }// , { manualSelect: true }
-            );
+            complete({ 
+               id, 
+               startedAt, 
+               endedAt: nowIso(), 
+               verdict: 'warn', 
+               notes: ['DuT não encontrado na BD'] 
+            });
+            return;
          }
 
          const dut = productToDut(dbproduct, 'db');
-         return complete({ 
+
+         complete({ 
             id, 
             startedAt, 
             endedAt: nowIso(), 
             verdict: 'pass' 
-         },{ 
-            // manualSelect: false, 
-            productData: dbproduct, 
-            dut 
+         }, { 
+            dut, 
+            productData: dbproduct 
          });
-
       })();
+      return () => { cancelled = true; };
+
    }, [id, isActive, complete]);
 
-   return null; // no UI; this is an auto step
+   return null; // no UI = auto step
 };
