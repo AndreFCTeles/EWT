@@ -190,9 +190,7 @@ const CalibrationViewer: React.FC<Props>  = ({ instrumentCode }) => {
                                  <Table.Tr key={i}>
                                     <Table.Td>
                                        <Tooltip label={`${r.reference} ${r.unit}`} withArrow>
-                                          <span>
-                                             {r.reference} <Text span c="dimmed">{r.unit}</Text>
-                                          </span>
+                                          <span>{r.reference} <Text span c="dimmed">{r.unit}</Text></span>
                                        </Tooltip>
                                     </Table.Td>
 

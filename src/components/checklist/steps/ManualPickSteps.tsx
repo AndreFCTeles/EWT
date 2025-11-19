@@ -31,10 +31,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
             endedAt: now, 
             inputs: { process: p }, 
             verdict: 'pass' 
-         },
-         { 
-            selectedProcess: p 
-         }
+         }, { selectedProcess: p }
       );
    };
 
@@ -68,11 +65,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
             endedAt: now, 
             inputs: { ratedCurrent: a }, 
             verdict: 'pass' 
-         },
-         { 
-            // manualSelect: true, 
-            powerA: a 
-         }
+         }, { powerA: a }
       );
    };
 
@@ -120,10 +113,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
             endedAt: now, 
             inputs: { brand: brandName }, 
             verdict: 'pass' 
-         },
-         { 
-            brand: brandName 
-         }
+         }, { brand: brandName }
       );
    };
 

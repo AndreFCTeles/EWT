@@ -6,7 +6,7 @@ import { nowIso } from '@utils/generalUtils';
 
 
 
-export const DetectDutStep: React.FC<StepRuntimeProps> = ({ id, isActive, complete }) => {
+export const DetectPBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complete }) => {
    useEffect(() => {
       if (!isActive) return;
       let cancelled = false;
