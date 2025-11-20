@@ -10,7 +10,7 @@ import { DutProfile } from '@/types/dutProfileTypes';
 
 const DutSearchInner: React.FC<StepRuntimeProps> = ({
    id,
-   role,
+   //role,
    canGoBack,
    goBack,
    apply,      // does NOT navigate
@@ -52,12 +52,12 @@ const DutSearchInner: React.FC<StepRuntimeProps> = ({
 
    return (
       <StepShell
-      id={id}
+      //id={id}
       title="Identificação do equipamento sob teste"
-      role={role}
+      //role={role}
       canGoBack={canGoBack}
       onBack={goBack}
-      onNext={onNext}
+      //onNext={onNext}
       >
          <Stack>
             <TextInput

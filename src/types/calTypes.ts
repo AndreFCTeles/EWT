@@ -1,14 +1,13 @@
 // CAL PARSE
-
 export type MeasurementKind =
    | "voltage_dc"
    | "voltage_ac"
    | "current_dc"
    | "current_ac"
-   | "other"
-   | string;
+   | "other";
+   // | string;
    
-export type Wave = "dc" | "ac" | string;
+export type Wave = "dc" | "ac"; // | string;
 export type UnitBase = "A" | "V";
 
 export type SimpleTest = {

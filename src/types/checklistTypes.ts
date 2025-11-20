@@ -1,10 +1,27 @@
-import type { RatedCurrent, Process, DeviceOrigin } from "./protocolTypes";
-import type { ProductData } from "./productTypes";
+import type { FuncData, ProdCategory, ProductData, TechnicalData } from "./productTypes";
+import type { Tol } from "./generalTypes";
 
 
 
 
 
+//GENERAL
+export type Process = 'MIG'|'TIG'|'MMA';
+export const PROCESSES: Process[] = ['MIG', 'TIG', 'MMA'];
+export type RatedCurrent = 300|400|500|600|1000;
+export const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
+export type DeviceOrigin = 'db'|'manual'|'autodetect';
+export type Unit = 'V'|'A'|'Ω'|'°C'|'mV'|'mA'|'kΩ'|'%';
+export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
+
+export type Verdict = 
+   'pass' | 'warn' | 'fail' | 'skipped' | 
+   'OK' | 'aviso' | 'falhou' | 'ignorado' | '-' | 'N/A';
+
+
+
+
+// STEPS
 export type StepId =
    'detectPowerBank' | 'pickProcedure' 
    | 'specs' | 'dutSearch' | 'dut'
@@ -39,7 +56,7 @@ export type StepRecord = {
    inputs?: Record<string, unknown>;
    commanded?: Record<string, unknown>;
    measured?: Record<string, number>;
-   toleranceUsed?: unknown; // Tol shape
+   toleranceUsed?: Tol; // Tol shape - Ou usar SimpleTest de calTypes.ts?
    verdict: Verdict;
    notes?: string[];
 };
@@ -47,15 +64,29 @@ export type StepRecord = {
 
 
 
-export type Verdict = 
-   'pass' | 'warn' | 'fail' | 'skipped' | 
-   'OK' | 'aviso' | 'falhou' | 'ignorado' | '-' | 'N/A';
-
-export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
 
 
 
 
+//REPORT
+export type ProductDoc = {
+   _id?: string ;
+   prodName: string;
+   brand: string;
+   series?: string;
+   serialno?: string;
+   category: ProdCategory;
+   format?: ProdCategory;
+   technical?: TechnicalData[];
+   applications?: string;
+   description?: string;
+   functions?: FuncData[];
+   images?: ImageData[];
+   createdDate?: string;
+   updatedDate?: string;
+};
+
+/* old 
 export type ProductDoc = {
    _id?: { $oid: string };
    prodName: string;
@@ -85,6 +116,7 @@ export type ProductDoc = {
    createdDate?: string;
    updatedDate?: string;
 };
+*/
 
 
 export type Dut = {

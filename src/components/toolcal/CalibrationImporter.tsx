@@ -7,7 +7,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 
 type Props = {
-  onImported?: (codes: Instrument[]) => void;
+   onImported?: (codes: Instrument[]) => void;
 };
 
 const CalibrationImporter: React.FC<Props> = ({ onImported }) => {

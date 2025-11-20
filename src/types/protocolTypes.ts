@@ -1,3 +1,5 @@
+import { Unit } from "./checklistTypes";
+
 // Connection Params
 export type Baud = 9600|19200|38400|57600|115200|230400|460800|921600;
 export interface SerialParams {
@@ -29,7 +31,6 @@ export enum MsgId {
    MEASUREMENTS=0x10, 
    SET_SETPOINT=0x20, 
    INTERLOCKS=0x30 }
-export type Unit = 'V'|'A'|'Ω'|'°C'|'mV'|'mA'|'kΩ'|'%';
 export interface MeasurementChannel { 
    name:string; 
    value:number; 
@@ -56,10 +57,8 @@ export interface MeasurementsFrame {
 }
 export type DeviceFrame = AckFrame|NackFrame|PongFrame|MeasurementsFrame;
 
-// DuT
-export type Process = 'MIG'|'TIG'|'MMA';
-export type RatedCurrent = 300|400|500|600|1000;
-export type DeviceOrigin = 'db'|'manual'|'autodetect';
+
+/*
 export interface Dut { 
    prodName:string; 
    brand:string; 
@@ -70,12 +69,13 @@ export interface Dut {
    format?:string; 
    origin:DeviceOrigin 
 }
+*/
 
 // Multimeter
 export interface MultimeterPoint { 
    key:string; 
    value:number; 
-   unit:Unit|string; 
+   unit:Unit; //|string 
    ts?:string 
 }
 export interface MultimeterReading { 

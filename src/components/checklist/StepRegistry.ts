@@ -10,7 +10,9 @@ import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPick
 import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
-import { DetectPBStep } from '@/components/checklist/steps/DetectPBStep';
+import { DetectPBStep } from '@checklist/steps/DetectPBStep';
+//import { DutSearchStep } from '@checklist/steps/DutSearchStep';
+//import { DutInfoStep } from '@checklist/steps/DutInfoStep';
 
 
 
@@ -26,8 +28,8 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    detectPowerBank:        DetectPBStep, //auto
    pickProcedure:          ProcedurePickerStep,
 
-   dutSearch:              DutSearchStep,
-   dut:                    DutInfoStep, // nome dut, form com specs principais
+   dutSearch:              SkipStep, //DutSearchStep,
+   dut:                    SkipStep, //DutInfoStep, // nome dut, form com specs principais
 
    pickProcess:            PickProcessStep,
    pickPower:              PickPowerStep,

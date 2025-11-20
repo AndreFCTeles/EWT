@@ -5,7 +5,7 @@ import type { Submission } from '@/types/checklistTypes';
 import { nowIso } from '@utils/generalUtils';
 import { StepShell } from '../StepShell';
 
-export const DutDetailsStep: React.FC<StepRuntimeProps> = ({
+export const DutInfoStep: React.FC<StepRuntimeProps> = ({
    id,
    role,
    canGoBack,

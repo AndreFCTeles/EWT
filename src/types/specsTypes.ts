@@ -1,5 +1,4 @@
-import type { Dut } from './checklistTypes';
-import type { Unit } from './protocolTypes';
+import type { Dut, Process, Unit } from './checklistTypes';
 
 
 export type SpecId = string;
@@ -7,7 +6,7 @@ export type SpecId = string;
 export interface SpecsVerdict {
   pass: boolean;
   value: number;
-  unit?: Unit | string;
+  unit?: Unit; // | string;
   target?: number;
   min?: number;
   max?: number;
@@ -25,7 +24,7 @@ export interface RangeSpec {
   tol?: Tolerance;
   min?: number;
   max?: number;
-  unit?: Unit | string;
+  unit?: Unit; // | string;
 }
 
 export interface OcvSpec {
@@ -67,8 +66,8 @@ export interface EolSpec {
   id: SpecId;
   model: string;
   version: string;
-  processes?: Array<'MIG'|'TIG'|'MMA'>;
-  ocv?: OcvSpec;
+  processes?: Process[];
+  ocv?: OcvSpec;        // Open Circuit Voltage / Tensão de vazio
   interlocks?: InterlocksSpec;
   connections?: ConnectionsSpec;
   vrd?: VrdSpec;

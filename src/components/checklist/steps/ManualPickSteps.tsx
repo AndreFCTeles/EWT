@@ -3,11 +3,13 @@ import { Button, Group, Loader, ScrollArea, Stack, Text } from '@mantine/core';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
-import type { RatedCurrent, Process } from '@/types/protocolTypes';
+//import type { RatedCurrent, Process } from '@/types/protocolTypes';
 
 import { fetchBrands } from '@/services/api/epmApi';
 import { nowIso } from '@utils/generalUtils';
 import { API_URL } from '@/lib/config';
+import { Process, RatedCurrent } from '@/types/checklistTypes';
+import { PROCESSES, POWERS } from '@/types/checklistTypes';
 
 
 
@@ -15,8 +17,6 @@ import { API_URL } from '@/lib/config';
 
 
 
-const PROCESSES: Process[] = ['MIG', 'TIG', 'MMA'];
-const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
 
 
 

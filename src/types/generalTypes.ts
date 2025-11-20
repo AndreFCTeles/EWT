@@ -1,3 +1,5 @@
+import { Polarity } from "./checklistTypes";
+
 // USER SETTINGS
 export const LS_LAST             = 'ewt_lastUsername';   // last username (conveniência)
 export const LS_REMEMBER         = 'ewt_rememberMe';     // '1' | '0'  (remember username)
@@ -73,7 +75,7 @@ export type TolPiece = {
 export type Tol = TolAbs | TolPct | TolCombo | TolPiece;
 
 
-// Dut
+
 export type Probe = {
    connected: boolean;
    hwId?: string;
@@ -105,5 +107,5 @@ export type InterlockState = { // Abstraction. TODO: Replace with real I/O (WebU
    gasOk?: boolean;
    coolantOk?: boolean;
    mainsOk?: boolean;
-   polarityContinuity?: 'ok' | 'reversed' | 'open' | 'unknown';
+   polarityContinuity?: Polarity;
 };
