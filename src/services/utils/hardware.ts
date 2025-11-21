@@ -21,7 +21,7 @@ import { DEV_STUB_CONNECTED, DEV_STUB_DB_MATCH } from "@/dev/devConfig";
 // ───────────────────────────────────────────────────────────────────────────────
 
 /** Probe the controller to see if a DUT is connected (stub for now). */
-export async function probeConnectedDut(): Promise<Probe> {
+export async function probeConnectedPB(): Promise<Probe> {
    await delay(200);
    // flip these while testing flows
    

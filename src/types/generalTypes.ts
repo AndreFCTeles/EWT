@@ -95,8 +95,10 @@ export const STUB_BRANDS: Brand[] = [
    { id: 'b-fron', name: 'Fronius' },
    { id: 'b-kemp', name: 'Kemppi' },
 ];
+/*
 export type STUBBIER_BRANDS_TYPE = 'Electrex' | 'EWM' | 'ESAB' | 'Fronius' | 'Kemppi' | '';
 export const STUBBIER_BRANDS: STUBBIER_BRANDS_TYPE[] = ['Electrex','EWM','ESAB','Fronius','Kemppi'];
+*/
 
 
 

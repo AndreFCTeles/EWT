@@ -1,7 +1,7 @@
 import type { Dut } from '@/types/checklistTypes';
 import type { EolSpec } from '@/types/specsTypes';
 import seed from '@/dev/specsSeed.json' assert { type: 'json' };
-import type { Process, RatedCurrent } from '@/types/protocolTypes';
+import type { Process, RatedCurrent } from '@/types/checklistTypes';
 
 export async function loadSpecs(): Promise<EolSpec[]> {
   try {

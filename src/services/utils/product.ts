@@ -1,6 +1,6 @@
 import type { ProductData, ProdCategory, TechnicalData } from '@/types/productTypes';
 //import type { Processes, AvailablePowers } from '@/types/generalTypes';
-import type { Process, RatedCurrent } from '@/types/protocolTypes';
+import type { Process, RatedCurrent } from '@/types/checklistTypes';
 
 
 

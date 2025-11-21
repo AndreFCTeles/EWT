@@ -1,7 +1,7 @@
 import { currentFromTechnical, deriveProcesses } from './product';
 
 //import { Processes, DeviceOrigin, AvailablePowers } from '@/types/generalTypes'; // , STUBBIER_BRANDS_TYPE
-import type { Process, DeviceOrigin, RatedCurrent } from '@/types/protocolTypes';
+import type { Process, DeviceOrigin, RatedCurrent } from '@/types/checklistTypes';
 import type { ProductData, ProdCategory } from '@/types/productTypes';
 import type { Dut } from '@/types/checklistTypes';
 import { nowIso } from './generalUtils';

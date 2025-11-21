@@ -3,7 +3,7 @@ import { NumberInput, Select, Stack, TextInput } from '@mantine/core';
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import type { Submission } from '@/types/checklistTypes';
 import { nowIso } from '@utils/generalUtils';
-import { StepShell } from '../StepShell';
+import { StepShell } from '../checklist/StepShell';
 
 export const DutInfoStep: React.FC<StepRuntimeProps> = ({
    id,

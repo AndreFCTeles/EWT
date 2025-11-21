@@ -1,11 +1,11 @@
 import React from 'react';
 import { Stack, TextInput } from '@mantine/core'; // , Select
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import { DutSearchProvider, useDutSearch } from '@/components/dut/DutSearchContext';
-import { DutGrid } from '@/components/dut/DutGrid';
+import { DutSearchProvider, useDutSearch } from '@/components/autoDut/DutSearchContext';
+import { DutGrid } from '@/components/autoDut/DutGrid';
 import { nowIso } from '@utils/generalUtils';
 import { productToDutFromProfile } from '@utils/dutMapping';
-import { StepShell } from '../StepShell';
+import { StepShell } from '../checklist/StepShell';
 import { DutProfile } from '@/types/dutProfileTypes';
 
 const DutSearchInner: React.FC<StepRuntimeProps> = ({

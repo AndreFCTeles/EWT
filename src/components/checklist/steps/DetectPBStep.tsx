@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import { probeConnectedDut, lookupProductByHwId } from '@utils/hardware';
+import { probeConnectedPB, lookupProductByHwId } from '@utils/hardware';
 import { productToDut } from '@utils/dut';
 import { nowIso } from '@utils/generalUtils';
 
@@ -13,7 +13,7 @@ export const DetectPBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complet
 
       (async () => {
          const startedAt = nowIso();
-         const probe = await probeConnectedDut();
+         const probe = await probeConnectedPB();
          if (cancelled) return;
 
          if (!probe.connected) {
