@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Badge, Group, Loader, ScrollArea, Stack, Table, Text, Tooltip } from "@mantine/core";
 
-import type { SimpleCalibration, Section, Row, MeasurementKind, Wave } from "@/types/calTypes";
+import type { SimpleCalibration, Section, Row, MeasurementKind, Wave } from "@/types/toolCalTypes";
 import { useLatestCalibration } from "@/hooks/useToolCal";
 import { serialToFormatDate } from "@utils/generalUtils";
 

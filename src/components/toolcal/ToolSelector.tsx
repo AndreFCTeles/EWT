@@ -5,7 +5,7 @@ import { notifications } from "@mantine/notifications";
 import { listCachedInstruments, getSelectedInstrumentCode, setSelectedInstrumentCode } from "@/services/api/toolData/calCache";
 import { listLatestPerInstrument } from "@/services/api/toolData/toolApi";
 import { checkOnline } from "@/services/api/toolData/toolApi.offline";
-import type { Instrument, InstrumentRow } from "@/types/calTypes";
+import type { Instrument, InstrumentRow } from "@/types/toolCalTypes";
 import { serialToFormatDate } from "@utils/generalUtils";
 import CalibrationImporter from "./CalibrationImporter";
 

@@ -1,7 +1,7 @@
 import type { 
    SimpleCalibration, 
    ListParams 
-} from "@/types/calTypes"; //, ExistsResponse
+} from "@/types/toolCalTypes"; //, ExistsResponse
 
 const API_BASE = import.meta.env.VITE_DB_HOST
 

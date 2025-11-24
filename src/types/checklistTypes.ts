@@ -6,8 +6,8 @@ import type { Tol } from "./generalTypes";
 
 
 //GENERAL
-export type Process = 'MIG'|'TIG'|'MMA';
-export const PROCESSES: Process[] = ['MIG', 'TIG', 'MMA'];
+export type Process = 'MMA'|'TIG'|'MIGConv'|'MIGInv';
+export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGConv', 'MIGInv'];
 export type RatedCurrent = 300|400|500|600|1000;
 export const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
 export type DeviceOrigin = 'db'|'manual'|'autodetect';
@@ -32,8 +32,8 @@ export type StepId =
    | `proc:${Process}:start`
    | `proc:${Process}:sweep`
    | `proc:${Process}:thermal`
-   | `proc:${'MIG' | 'TIG'}:pulse`
-   | `proc:${'MIG' | 'TIG'}:gas`
+   | `proc:${'MIGInv' | 'TIG'}:pulse`
+   | `proc:${'MIGInv' | 'TIG'}:gas`
    | 'summary' | 'export';
 
 export const PIPELINE: StepId[] = [
@@ -42,7 +42,7 @@ export const PIPELINE: StepId[] = [
    'pickProcess', 'pickPower', 'pickBrand',
    'interlocks', 'connections', 'selftests', 'calstatus',
    'ocv',
-   'proc:MIG:nominals', 'proc:MIG:start', 'proc:MIG:sweep', 'proc:MIG:pulse', 'proc:MIG:thermal', 'proc:MIG:gas',
+   'proc:MIGInv:nominals', 'proc:MIGInv:start', 'proc:MIGInv:sweep', 'proc:MIGInv:pulse', 'proc:MIGInv:thermal', 'proc:MIGInv:gas',
    'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
    'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',
    'summary', 'export'

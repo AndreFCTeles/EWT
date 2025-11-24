@@ -1,13 +1,10 @@
-import type { InterlockState, Probe } from "@/types/generalTypes"; // DB_HOST,
-import type { ProductData } from "@/types/productTypes";
+import { invoke } from "@tauri-apps/api/core";
+
 import { delay } from "./generalUtils";
+import { findFirstLoadBankFrame, buildLoadBankFrame } from "./lbProtocol";
+import type { LoadBankFrame, LoadBankStatus } from "./lbProtocol";
 
-
-// dev
-import { DEV_STUB_CONNECTED, DEV_STUB_DB_MATCH } from "@/dev/devConfig";
-
-
-
+import type { InterlockState, Probe } from "@/types/generalTypes"; // DB_HOST
 
 
 
@@ -16,56 +13,142 @@ import { DEV_STUB_CONNECTED, DEV_STUB_DB_MATCH } from "@/dev/devConfig";
 
 
 
-// ───────────────────────────────────────────────────────────────────────────────
-// DUT probe & DB lookup
-// ───────────────────────────────────────────────────────────────────────────────
-
-/** Probe the controller to see if a DUT is connected (stub for now). */
-export async function probeConnectedPB(): Promise<Probe> {
-   await delay(200);
-   // flip these while testing flows
-   
-   return DEV_STUB_CONNECTED
-      ? { 
-         connected: true, 
-         hwId: 'HW-EX-600', 
-         serial: 'SN-0001' 
-      } : { 
-         connected: false 
-      };
+function toHex(bytes: number[]): string {
+   return bytes.map(b => b
+      .toString(16)
+      .toUpperCase()
+      .padStart(2, "0")
+   ).join(" ");
 }
 
 
-/** Look up a Product by hardware ID (stub DB; align category root to 'maq'). */
-export async function lookupProductByHwId(hwId: string): Promise<ProductData | null> {
-   void hwId;
-   await delay(150);
-   if (!DEV_STUB_DB_MATCH) return null;
+
+
+
+
+
+// ───────────────────────────────────────────────────────────────────────────────
+// LoadBank Probe
+// ───────────────────────────────────────────────────────────────────────────────
+/**
+ * Try to find a load bank on any available COM port.
+ * Returns Probe { connected, hwId, serial, portName? }.
+ */
+export async function probeConnectedLB(): Promise<Probe> {
+   const ports = await invoke<string[]>("list_ports");
+   const defaultBaud = 115200;
+
+   for (const portName of ports) {
+      try {
+         await invoke("connect", { portName, defaultBaud });
+
+         // Ask Tauri to just listen (no TX) for a short window.
+         const roundtrip = await invoke<{
+            sent_bytes: number[];
+            recv_bytes: number[];
+            sent_hex: string;
+            recv_hex: string;
+         }>("test_roundtrip_bytes", { data: [], durationMs: 500 });
+
+         await invoke("close").catch(() => {});
+
+         const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
+         if (!match) continue;
+
+         const { parsed } = match;
+
+         // Map to your Probe type; adapt if Probe has more fields.
+         return {
+            connected: true,
+            hwId: `LB-${parsed.bankPower}-${parsed.bankNo}`,
+            serial: `LB-${parsed.bankNo}`,
+            portName,
+         } as Probe;
+      } catch {
+         // Ignore this port, carry on
+         try { await invoke("close"); } catch { /* ignore */ }
+      }
+   }
+
+   return { connected: false } as Probe;
+}
+
+
+export async function setLoadBankContactors(opts: {
+   portName: string;
+   baud?: number;
+   lastStatus: LoadBankFrame; // to reuse version / bankPower / bankNo
+   contactorsMask: number;     // 16-bit mask, C1..C16
+}): Promise<LoadBankStatus> {
+   const baud = opts.baud ?? 115200;
+
+   // Build a frame using the last known meta-fields
+   const txFrame = buildLoadBankFrame({
+      version: opts.lastStatus.version,
+      bankPower: opts.lastStatus.bankPower,
+      bankNo: opts.lastStatus.bankNo,
+      contactorsMask: opts.contactorsMask,
+
+      // Send 0 in the error fields; the bank will fill them in its reply.
+      errContactors: 0,
+      errFans: 0,
+      errThermals: 0,
+      otherErrors: 0,
+   });
+
+   await invoke("connect", { portName: opts.portName, baud });
+
+   const roundtrip = await invoke<{
+      sent_bytes: number[];
+      recv_bytes: number[];
+      sent_hex: string;
+      recv_hex: string;
+   }>("test_roundtrip_bytes", {
+      data: Array.from(txFrame),
+      durationMs: 500,
+   });
+
+   await invoke("close").catch(() => {});
+
+   const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
+   if (!match) {
+      throw new Error("Load bank did not respond with a valid frame after contactor command");
+   }
+
+   const { raw, parsed } = match;
+
    return {
-      prodName: 'MIG 604 CW',
-      brand: 'Electrex',
-      series: '4',
-      category: { 
-         main: 'maq', 
-         sub: { 
-            main: 'maq-mig', 
-            format: 'maq-mig-f-com', 
-            sub: { 
-               main: 'maq-mig-bas' 
-            } 
-         } 
-      },
-      technical: [{ 
-         field: 'Corrente nominal', 
-         value: '600', 
-         suf: 'A' 
-      }],
-      description: '', 
-      applications: '', 
-      functions: [], 
-      images: [],
+      ...parsed,
+      portName: opts.portName,
+      rawFrameHex: toHex(Array.from(raw)),
    };
 }
+
+
+export async function readLoadBankStatusOnce(portName: string, baud = 115200): Promise<LoadBankStatus | null> {
+   await invoke("connect", { portName, baud });
+   const roundtrip = await invoke<{
+      sent_bytes: number[];
+      recv_bytes: number[];
+      sent_hex: string;
+      recv_hex: string;
+   }>("test_roundtrip_bytes", { data: [], durationMs: 300 });
+   await invoke("close").catch(() => {});
+
+   const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
+   if (!match) return null;
+
+   const { raw, parsed } = match;
+   return {
+      ...parsed,
+      portName,
+      rawFrameHex: toHex(Array.from(raw)),
+   };
+}
+
+
+
+
 
 
 
@@ -105,15 +188,6 @@ class SignalsClass implements Signals {
    async getInterlocks(): Promise<InterlockState> {
       return this.state;
    }
-
-   /*
-   subscribeInterlocks(cb: (s: InterlockState) => void) {
-      this.listeners.add(cb);
-      cb(this.state);
-      return () => this.listeners.delete(cb);
-   }
-   async measureOCV() { return { voltage: 78.9 }; }
-   */
 
     /** Subscribe to interlock updates; returns unsubscribe. */
    subscribeInterlocks(cb: (s: InterlockState) => void): () => void {
@@ -177,3 +251,8 @@ export async function waitForSignal(
    }
    return false;
 }
+
+
+
+
+

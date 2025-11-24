@@ -7,7 +7,16 @@ import { nowIso } from '@utils/generalUtils';
 import { buildReport } from '@utils/report';
 
 
-export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete}) => {//, id 
+export const SummaryStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   alreadyCompleted, 
+   canGoBack, 
+   goBack, 
+   isActive, 
+   complete, 
+   abort,
+   submission 
+} ) => {//, id 
    const rows = submission.steps.map(s => (
       <Table.Tr key={s.id}>
          <Table.Td>{s.id}</Table.Td>
@@ -17,7 +26,10 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
    ));
 
    return (
-      <StepShell title="Conclusão">
+      <StepShell 
+      title="Conclusão"
+      canGoBack={canGoBack} 
+      onBack={goBack}>
          <Table.ScrollContainer minWidth={500}><Table withTableBorder>
             <Table.Thead>
                <Table.Tr>
@@ -42,7 +54,16 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ({ submission, complete})
    );
 };
 
-export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
+export const ExportStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   alreadyCompleted, 
+   canGoBack, 
+   goBack, 
+   isActive, 
+   complete, 
+   abort,
+   submission 
+} ) => {
    const report = useMemo(() => buildReport(submission), [submission]);
    const json = JSON.stringify(report, null, 2);
 
@@ -56,7 +77,7 @@ export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const name = `${slug(report.dut?.prodName)}-${report.reportId ?? Date.now()}.json`;
+      const name = `${slug(report.dut?.prodName)}-${report.reportId ?? nowIso()}.json`;
       a.download = name;
       a.href = url;
       a.click();
@@ -64,7 +85,10 @@ export const ExportStep: React.FC<StepRuntimeProps> = ({ submission }) => {
    };
 
    return (
-      <StepShell title="Exportação">
+      <StepShell 
+      title="Exportação"
+      canGoBack={canGoBack} 
+      onBack={goBack}>
          <Code block style={{ maxHeight: 300, overflow: 'auto' }}>{json}</Code>
          <Group mt="md">
             <Button onClick={download}>Descarregar ficheiro</Button>

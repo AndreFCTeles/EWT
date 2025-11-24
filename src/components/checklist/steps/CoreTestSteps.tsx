@@ -147,11 +147,14 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
 // ---------- Connections ----------
 export const ConnectionsStep: React.FC<StepRuntimeProps> = ( { 
    id, 
-   complete, 
+   alreadyCompleted, 
    role, 
-   abort, 
-   isActive,
-   submission
+   canGoBack, 
+   goBack, 
+   isActive, 
+   complete, 
+   abort,
+   submission 
 } ) => {
    const [polarity, setPolarity] = useState<Polarity>('unknown');
    const [allowOverride, setAllowOverride] = useState<boolean>(false);
@@ -188,7 +191,10 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
    };
 
    return (
-      <StepShell title="Connections & Polarity">
+      <StepShell 
+      title="Connections & Polarity"
+      canGoBack={canGoBack} 
+      onBack={goBack}>
          {polarity !== 'ok' && (
             <Alert color="yellow" mb="sm" title="Check connections">
                Current reading: <b>{polarity}</b>. Fix wiring or override (admin).
@@ -217,9 +223,13 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
 // ---------- OCV ----------
 export const OcvStep: React.FC<StepRuntimeProps> = ( { 
    id, 
+   alreadyCompleted, 
+   canGoBack, 
+   goBack, 
+   isActive, 
    complete, 
-   submission, 
-   isActive 
+   abort,
+   submission 
 } ) => {
    const [reading, setReading] = useState<number | null>(null);
    const [range, setRange] = useState<RangeSpec | null>(null);
@@ -277,7 +287,10 @@ export const OcvStep: React.FC<StepRuntimeProps> = ( {
    };
 
    return (
-      <StepShell title="OCV / VRD">
+      <StepShell 
+      title="OCV / VRD"
+      canGoBack={canGoBack} 
+      onBack={goBack}>
          <Group>
             <Button fullWidth onClick={onMeasure} disabled={!isActive}>Measure OCV</Button>
             {reading != null && <Text>Leitura: {reading.toFixed(2)} V (Target {target} V)</Text>}

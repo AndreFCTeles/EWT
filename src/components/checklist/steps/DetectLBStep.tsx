@@ -1,19 +1,19 @@
 import { useEffect } from 'react';
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import { probeConnectedPB, lookupProductByHwId } from '@utils/hardware';
-import { productToDut } from '@utils/dut';
+import { probeConnectedLB } from '@utils/hardware';//, lookupProductByHwId
+//import { productToDut } from '@utils/dut';
 import { nowIso } from '@utils/generalUtils';
 
 
 
-export const DetectPBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complete }) => {
+export const DetectLBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complete }) => {
    useEffect(() => {
       if (!isActive) return;
       let cancelled = false;
 
       (async () => {
          const startedAt = nowIso();
-         const probe = await probeConnectedPB();
+         const probe = await probeConnectedLB();
          if (cancelled) return;
 
          if (!probe.connected) {
@@ -22,11 +22,12 @@ export const DetectPBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complet
                startedAt, 
                endedAt: nowIso(), 
                verdict: 'warn', 
-               notes: ['DuT não conectado'] 
+               notes: ['Banca de carga não conectada'] 
             });
             return;
          }
 
+         /*
          const dbproduct = probe.hwId ? await lookupProductByHwId(probe.hwId) : null;
          if (cancelled) return;
 
@@ -52,6 +53,7 @@ export const DetectPBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complet
             dut, 
             productData: dbproduct 
          });
+            */
       })();
       return () => { cancelled = true; };
 

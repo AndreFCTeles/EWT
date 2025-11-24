@@ -1,4 +1,4 @@
-import type { SimpleCalibration, ListParams, InstrumentRow } from "@/types/calTypes";
+import type { SimpleCalibration, ListParams, InstrumentRow } from "@/types/toolCalTypes";
 import {
    listSimpleCalibrations as listOnline,
    getLatestCalibrationForInstrument as getLatestOnline,

@@ -10,7 +10,7 @@ import {
    ensureCacheServerSync,
    refreshCacheFromServer
 } from "@/services/api/toolData/toolApi.offline";
-import type { SimpleCalibration } from "@/types/calTypes";
+import type { SimpleCalibration } from "@/types/toolCalTypes";
 import { listSimpleCalibrations } from "@/services/api/toolData/toolApi";
 
 

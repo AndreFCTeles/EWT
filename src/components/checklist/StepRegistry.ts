@@ -10,7 +10,7 @@ import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPick
 import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
-import { DetectPBStep } from '@checklist/steps/DetectPBStep';
+import { DetectLBStep } from '@/components/checklist/steps/DetectLBStep';
 //import { DutSearchStep } from '@checklist/steps/DutSearchStep';
 //import { DutInfoStep } from '@checklist/steps/DutInfoStep';
 
@@ -25,7 +25,7 @@ import { DetectPBStep } from '@checklist/steps/DetectPBStep';
 export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    //login:                SkipStep, //aproveita para detetar api, not rendered, aguarda LoginModal "success"
 
-   detectPowerBank:        DetectPBStep, //auto
+   detectPowerBank:        DetectLBStep, //auto
    pickProcedure:          ProcedurePickerStep,
 
    dutSearch:              SkipStep, //DutSearchStep,
@@ -70,6 +70,6 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
 
 export const AUTO_COMPONENTS = new Set<React.FC<StepRuntimeProps>>([
    SkipStep,
-   DetectPBStep as React.FC<StepRuntimeProps>, // as unknown 
+   DetectLBStep as React.FC<StepRuntimeProps>, // as unknown 
    InterlocksStep as React.FC<StepRuntimeProps>,
 ]);

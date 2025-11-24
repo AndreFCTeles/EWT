@@ -1,4 +1,4 @@
-import type { InstrumentRow, SimpleCalibration } from "@/types/calTypes";
+import type { InstrumentRow, SimpleCalibration } from "@/types/toolCalTypes";
 import { readTextFile, writeTextFile, exists, mkdir } from "@tauri-apps/plugin-fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { nowIso } from "@/services/utils/generalUtils";

@@ -1,4 +1,4 @@
-import type { SimpleCalibration, SimpleTest } from "@/types/calTypes";
+import type { SimpleCalibration, SimpleTest } from "@/types/toolCalTypes";
 
 export const getUsableTests = (cal?: SimpleCalibration | null): SimpleTest[] =>
    (cal?.tests ?? []).filter((t) => t.usable !== false);

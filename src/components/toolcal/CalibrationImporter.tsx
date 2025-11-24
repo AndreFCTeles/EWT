@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import type { SimpleCalibration, Instrument } from "@/types/calTypes";
+import type { SimpleCalibration, Instrument } from "@/types/toolCalTypes";
 import { upsertCalibration } from "@/services/api/toolData/toolApi.offline";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";

@@ -39,7 +39,7 @@ pub fn run() {
             max_memory,
             list_process,
             //clock_now,
-            //list_ports,
+            list_ports,
             //open_and_handshake,
             start_clock,
             close,
