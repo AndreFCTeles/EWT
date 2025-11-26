@@ -11,6 +11,7 @@ import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
 import { DetectLBStep } from '@/components/checklist/steps/DetectLBStep';
+import LoadBankCalibrationStep from './steps/LBCalStep';
 //import { DutSearchStep } from '@checklist/steps/DutSearchStep';
 //import { DutInfoStep } from '@checklist/steps/DutInfoStep';
 
@@ -23,46 +24,51 @@ import { DetectLBStep } from '@/components/checklist/steps/DetectLBStep';
 
 // Script
 export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
-   //login:                SkipStep, //aproveita para detetar api, not rendered, aguarda LoginModal "success"
+   //login:/*-----------------*/SkipStep, //aproveita para detetar api, not rendered, aguarda LoginModal "success"
 
-   detectPowerBank:        DetectLBStep, //auto
-   pickProcedure:          ProcedurePickerStep,
+   detectPowerBank:/*-------*/DetectLBStep, //auto
+   pickProcedure:/*---------*/ProcedurePickerStep,
 
-   dutSearch:              SkipStep, //DutSearchStep,
-   dut:                    SkipStep, //DutInfoStep, // nome dut, form com specs principais
+   dutSearch:/*-------------*/SkipStep, //DutSearchStep,
+   dut:/*-------------------*/SkipStep, //DutInfoStep, // nome dut, form com specs principais
 
-   pickProcess:            PickProcessStep,
-   pickPower:              PickPowerStep,
-   pickBrand:              PickBrandStep,
+   pickProcess:/*-----------*/PickProcessStep,
+   pickPower:/*-------------*/PickPowerStep,
+   pickBrand:/*-------------*/PickBrandStep,
 
-   specs:                  SkipStep,
+   specs:/*-----------------*/SkipStep,
 
-   interlocks:             InterlocksStep,
-   connections:            ConnectionsStep,
-   selftests:              SkipStep,
-   calstatus:              SkipStep,
+   interlocks:/*------------*/SkipStep,//InterlocksStep,
+   connections:/*-----------*/SkipStep,//ConnectionsStep,
+   selftests:/*-------------*/SkipStep,
+   calstatus:/*-------------*/SkipStep,
+   calibration:/*-----------*/LoadBankCalibrationStep,
 
-   ocv:                    OcvStep,
+   ocv:/*-------------------*/OcvStep,
 
-   'proc:MIG:nominals':    SkipStep,
-   'proc:MIG:start':       SkipStep,
-   'proc:MIG:sweep':       SkipStep,
-   'proc:MIG:pulse':       SkipStep,
-   'proc:MIG:thermal':     SkipStep,
-   'proc:MIG:gas':         SkipStep,
-   'proc:TIG:nominals':    SkipStep,
-   'proc:TIG:start':       SkipStep,
-   'proc:TIG:sweep':       SkipStep,
-   'proc:TIG:pulse':       SkipStep,
-   'proc:TIG:thermal':     SkipStep,
-   'proc:TIG:gas':         SkipStep,
-   'proc:MMA:nominals':    SkipStep,
-   'proc:MMA:start':       SkipStep,
-   'proc:MMA:sweep':       SkipStep,
-   'proc:MMA:thermal':     SkipStep,
+   'proc:MIGInv:nominals':/**/SkipStep,
+   'proc:MIGInv:start':/*---*/SkipStep,
+   'proc:MIGInv:sweep':/*---*/SkipStep,
+   'proc:MIGInv:pulse':/*---*/SkipStep,
+   'proc:MIGInv:thermal':/*-*/SkipStep,
+   'proc:MIGInv:gas':/*-----*/SkipStep,
+   'proc:TIG:nominals':/*---*/SkipStep,
+   'proc:TIG:start':/*------*/SkipStep,
+   'proc:TIG:sweep':/*------*/SkipStep,
+   'proc:TIG:pulse':/*------*/SkipStep,
+   'proc:TIG:thermal':/*----*/SkipStep,
+   'proc:TIG:gas':/*--------*/SkipStep,
+   'proc:MMA:nominals':/*---*/SkipStep,
+   'proc:MMA:start':/*------*/SkipStep,
+   'proc:MMA:sweep':/*------*/SkipStep,
+   'proc:MMA:thermal':/*----*/SkipStep,
+   "proc:MIGConv:nominals":   SkipStep, 
+   "proc:MIGConv:start":/*--*/SkipStep, 
+   "proc:MIGConv:sweep":/*--*/SkipStep, 
+   "proc:MIGConv:thermal":/**/SkipStep,
 
-   summary:                SummaryStep,
-   export:                 ExportStep,
+   summary:/*---------------*/SummaryStep,
+   export:/*----------------*/ExportStep,
 };
 
 

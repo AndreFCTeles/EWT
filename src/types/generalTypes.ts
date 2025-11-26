@@ -76,12 +76,6 @@ export type Tol = TolAbs | TolPct | TolCombo | TolPiece;
 
 
 
-export type Probe = {
-   connected: boolean;
-   hwId?: string;
-   serial?: string;
-}
-
 //export type Processes            = "MIG" | "MMA" | "TIG";
 //export type AvailablePowers      = 300 | 400 | 500 | 600;
 //export type DeviceOrigin         = 'db' | 'manual';

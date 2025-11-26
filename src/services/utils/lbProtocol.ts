@@ -1,31 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import { CRC8_TABLE, LoadBankFrame, LoadBankStatus, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
 
 
 
 
-// ------ CRC ------
-export const PB_FRAME_LEN = 16;
-export const PB_START = 0x01;
-export const PB_STOP = 0x00;
-
-const CRC8_TABLE: number[] = [
-   0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65,
-   157, 195, 33, 127, 252, 162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220,
-   35, 125, 159, 193, 66, 28, 254, 160, 225, 191, 93, 3, 128, 222, 60, 98,
-   190, 224, 2, 92, 223, 129, 99, 61, 124, 34, 192, 158, 29, 67, 161, 255,
-   70, 24, 250, 164, 39, 121, 155, 197, 132, 218, 56, 102, 229, 187, 89, 7,
-   219, 133, 103, 57, 186, 228, 6, 88, 25, 71, 165, 251, 120, 38, 196, 154,
-   101, 59, 217, 135, 4, 90, 184, 230, 167, 249, 27, 69, 198, 152, 122, 36,
-   248, 166, 68, 26, 153, 199, 37, 123, 58, 100, 134, 216, 91, 5, 231, 185,
-   140, 210, 48, 110, 237, 179, 81, 15, 78, 16, 242, 172, 47, 113, 147, 205,
-   17, 79, 173, 243, 112, 46, 204, 146, 211, 141, 111, 49, 178, 236, 14, 80,
-   175, 241, 19, 77, 206, 144, 114, 44, 109, 51, 209, 143, 12, 82, 176, 238,
-   50, 108, 142, 208, 83, 13, 239, 177, 240, 174, 76, 18, 145, 207, 45, 115,
-   202, 148, 118, 40, 171, 245, 23, 73, 8, 86, 180, 234, 105, 55, 213, 139,
-   87, 9, 235, 181, 54, 104, 138, 212, 149, 203, 41, 119, 244, 170, 72, 22,
-   233, 183, 85, 11, 136, 214, 52, 106, 43, 117, 151, 201, 74, 20, 246, 168,
-   116, 42, 200, 150, 21, 75, 169, 247, 182, 232, 10, 84, 215, 137, 107, 53,
-];
 
 
 
@@ -75,21 +53,9 @@ function decodeU16(hi: number, lo: number): number {
 
 
 
-
-
-export type LoadBankFrame = {
-   version: number;        // decoded
-   bankPower: number;      // decoded
-   bankNo: number;         // decoded
-   contactorsMask: number; // 16 bits C1..C16
-   errContactors: number;
-   errFans: number;
-   errThermals: number;
-   otherErrors: number;    // EV/EI/etc as bitfield
-};
 export function parseLoadBankFrame(buf: Uint8Array): LoadBankFrame | null {
-   if (buf.length !== PB_FRAME_LEN) return null;
-   if (buf[0] !== PB_START || buf[15] !== PB_STOP) return null;
+   if (buf.length !== LB_FRAME_LEN) return null;
+   if (buf[0] !== LB_START || buf[15] !== LB_STOP) return null;
 
    const crc = crc8LoadBank(buf);
    if (buf[14] !== crc) return null;
@@ -127,9 +93,9 @@ export type buildLoadBankFrameProps = {
    otherErrors?: number;
 }
 export function buildLoadBankFrame(input: buildLoadBankFrameProps ): Uint8Array {
-   const frame = new Uint8Array(PB_FRAME_LEN);
+   const frame = new Uint8Array(LB_FRAME_LEN);
 
-   frame[0] = PB_START;
+   frame[0] = LB_START;
    frame[1] = encodeU8(input.version);
 
    const [pHi, pLo] = encodeU16(input.bankPower);
@@ -152,7 +118,7 @@ export function buildLoadBankFrame(input: buildLoadBankFrameProps ): Uint8Array 
    frame[13] = encodeU8(input.otherErrors ?? 0);
 
    frame[14] = crc8LoadBank(frame);
-   frame[15] = PB_STOP;
+   frame[15] = LB_STOP;
 
    return frame;
 }
@@ -161,10 +127,13 @@ export function buildLoadBankFrame(input: buildLoadBankFrameProps ): Uint8Array 
  * Scan an arbitrary buffer (e.g. from test_roundtrip_bytes.recv_bytes)
  * and return the first valid frame & its parsed representation.
  */
-export function findFirstLoadBankFrame(raw: number[] | Uint8Array): { raw: Uint8Array; parsed: LoadBankFrame } | null {
+export function findFirstLoadBankFrame(raw: number[] | Uint8Array): { 
+   raw: Uint8Array; 
+   parsed: LoadBankFrame 
+} | null {
    const buf = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
-   for (let i = 0; i + PB_FRAME_LEN <= buf.length; i++) {
-      const slice = buf.subarray(i, i + PB_FRAME_LEN);
+   for (let i = 0; i + LB_FRAME_LEN <= buf.length; i++) {
+      const slice = buf.subarray(i, i + LB_FRAME_LEN);
       const parsed = parseLoadBankFrame(slice);
       if (parsed) return { raw: slice, parsed };
    }
@@ -172,46 +141,49 @@ export function findFirstLoadBankFrame(raw: number[] | Uint8Array): { raw: Uint8
 }
 
 
-export type LoadBankStatus = LoadBankFrame & {
-   portName: string;
-   rawFrameHex?: string;
-};
-
 export async function startLoadBankPolling(
-   portName: string,
+   port_name: string,
    onStatus: (s: LoadBankStatus) => void,
    abortSignal: AbortSignal,
    baud = 115200
 ) {
-   await invoke("connect", { portName, baud });
+   console.log("[LB] startLoadBankPolling", { port_name, baud });
+   await invoke("connect", { port_name, baud });
 
    const loop = async () => {
       while (!abortSignal.aborted) {
          try {
-         const roundtrip = await invoke<{
-            recv_bytes: number[];
-            sent_bytes: number[];
-         }>("test_roundtrip_bytes", {
-            data: [],          // just listen
-            durationMs: 200,
-         });
-
-         const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
-         if (match) {
-            onStatus({
-               ...match.parsed,
-               portName,
+            const roundtrip = await invoke<{
+               recv_bytes: number[];
+               sent_bytes: number[];
+            }>("test_roundtrip_bytes", {
+               data: [],          // just listen
+               duration_ms: 200,
             });
-         }
+
+            if (roundtrip.recv_bytes.length) {
+               console.debug( "[LB] poll recv_bytes", roundtrip.recv_bytes );
+            }
+            const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
+            if (match) {
+               onStatus({
+                  ...match.parsed,
+                  port_name,
+               });
+            }
          } catch (e) {
             console.error("Power bank poll error", e);
             // Optionally mark as offline here
+            await invoke("close").catch(() => {});
          }
          await new Promise(r => setTimeout(r, 300));
       }
+      console.log("[LB] polling loop stopped (abortSignal)");
    };
 
-   loop().catch(console.error);
+   loop().catch((err) => {
+      console.error("[LB] polling loop crashed", err);
+   });
 }
 
 
@@ -221,14 +193,14 @@ export async function commTest() {
    const ports = await invoke<string[]>("list_ports");
    console.log("Ports:", ports);
 
-   await invoke("connect", { portName: "COM5", baud: 115200 });
+   await invoke("connect", { port_name: "COM5", baud: 115200 });
 
    const res = await invoke<{
       sent_ascii: string;
       sent_hex: string;
       recv_hex: string;
       recv_ascii: string;
-   }>("test_roundtrip", { payload: "ABC 123\r\n", durationMs: 500 });
+   }>("test_roundtrip_text", { payload: "ABC 123\r\n", duration_ms: 500 });
 
    console.log("Sent ASCII:", res.sent_ascii);
    console.log("Sent HEX  :", res.sent_hex);

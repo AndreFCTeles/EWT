@@ -27,7 +27,7 @@ export type StepId =
    | 'specs' | 'dutSearch' | 'dut'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
    | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
-   | 'ocv'
+   | 'calibration' | 'ocv'
    | `proc:${Process}:nominals`
    | `proc:${Process}:start`
    | `proc:${Process}:sweep`
@@ -41,7 +41,7 @@ export const PIPELINE: StepId[] = [
    'specs', 'dutSearch',  'dut',
    'pickProcess', 'pickPower', 'pickBrand',
    'interlocks', 'connections', 'selftests', 'calstatus',
-   'ocv',
+   'calibration','ocv',
    'proc:MIGInv:nominals', 'proc:MIGInv:start', 'proc:MIGInv:sweep', 'proc:MIGInv:pulse', 'proc:MIGInv:thermal', 'proc:MIGInv:gas',
    'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
    'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',

@@ -276,9 +276,10 @@ export const OcvStep: React.FC<StepRuntimeProps> = ( {
             commanded: { state: 'no-load' },
             measured: { ocv: reading },
             toleranceUsed: { 
+               kind: 'combo',
                abs: 2.0, 
                pct: 3, 
-               combo: 'intersection' 
+               //combo: 'intersection' 
             },
             verdict: verdictStr,
             notes,

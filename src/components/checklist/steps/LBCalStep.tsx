@@ -1,30 +1,34 @@
-// LoadBankCalibrationStep.tsx
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react"; // useMemo,
 import { Button, Group, NumberInput, Stack, Text, Badge } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { generateEquidistantSetpoints, CalibrationSetpoint } from "@/services/utils/setpoints";
-import { resolveLoadBankSetpoint, SetpointConfig } from "@/lib/loadBankConfig";
+import {  generateSetpointsForProcess, resolveLoadBankSetpoint } from "@/services/utils/setpoints";
 import { setLoadBankContactors } from "@/services/utils/hardware";
-import { startLoadBankPolling, LoadBankStatus } from "@/services/utils/lbProtocol";
+import { startLoadBankPolling } from "@/services/utils/lbProtocol";
 import type { Dut, Process } from "@/types/checklistTypes";
+import { LoadBankStatus, SetpointConfig } from "@/types/commTypes";
 
 type Props = {
    dut: Dut;
    process: Process;
-   portName: string;      // from detection step
+   port_name: string;      // from detection step
    minCurrent: number;
 };
 
 const MIN_CURRENT_FOR_SWITCH = 0.5; // A
 
-const LoadBankCalibrationStep = ({ dut, process, portName, minCurrent }: Props) => {
-   const maxRated = dut.ratedCurrent ?? 0;
+
+export const LoadBankCalibrationStep: React.FC<Props> = ({ dut, process, port_name, minCurrent }) => {
+   if (!dut.ratedCurrent) {
+      console.log("erro - potência não introduzida");
+      return;
+   }
+   const maxRated = dut.ratedCurrent;
    const [minSetpoint, setMinSetpoint] = useState<number>(() => {
       if (process === "MIGConv") return Math.round(maxRated * 0.25); // 25% rule as default
       return minCurrent ?? Math.round(maxRated * 0.25);
    });
-
+   
+   const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null); 
    const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(null);
    const [setpoints, setSetpoints] = useState<SetpointConfig[]>([]);
    const [activeSetpointId, setActiveSetpointId] = useState<number | null>(null);
@@ -34,19 +38,20 @@ const LoadBankCalibrationStep = ({ dut, process, portName, minCurrent }: Props) 
    // Start polling when component mounts
    useEffect(() => {
       const controller = new AbortController();
-      startLoadBankPolling(portName, s => setBankStatus(s), controller.signal)
+      startLoadBankPolling(port_name, s => setBankStatus(s), controller.signal)
          .catch(console.error);
       return () => {
          controller.abort();
       };
-   }, [portName]);
+   }, [port_name]);
 
    // Recompute setpoints whenever min/max changes
    useEffect(() => {
       if (!maxRated || !minSetpoint) return;
-      const currents = generateEquidistantSetpoints(minSetpoint, maxRated);
+      if (maxRated <= 0 || minSetpoint < 0) return;
+      const currents = generateSetpointsForProcess(process, minSetpoint, maxRated, 4);
       const configs = currents.map((currentA: number, idx: number) =>
-         resolveLoadBankSetpoint(process, "1000A", currentA) // choose bank type
+         resolveLoadBankSetpoint(idx + 1, process, "1000A", currentA) // choose bank type
       );
       setSetpoints(configs);
       setOptionIndices({});
@@ -79,7 +84,7 @@ const LoadBankCalibrationStep = ({ dut, process, portName, minCurrent }: Props) 
          // MMA: all-off first
          if (process === "MMA") {
          await setLoadBankContactors({
-            portName,
+            port_name,
             lastStatus: bankStatus,
             contactorsMask: 0x0000,
          });
@@ -87,12 +92,12 @@ const LoadBankCalibrationStep = ({ dut, process, portName, minCurrent }: Props) 
          }
 
          const newStatus = await setLoadBankContactors({
-            portName,
+            port_name,
             lastStatus: bankStatus,
             contactorsMask: nextOption.mask,
          });
 
-         setBankStatus({ ...newStatus, portName });
+         setBankStatus({ ...newStatus, port_name });
          setActiveSetpointId(sp.id);
          setOptionIndices(prev => ({ ...prev, [sp.id]: nextIdx }));
       } catch (e) {

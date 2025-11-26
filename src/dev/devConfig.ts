@@ -37,5 +37,5 @@ export const DEFAULT_FRAME = {
    maxPayload:256 
 
 };
-export const STUB_DUTS = [] as import('@/types/protocolTypes').Dut[];
-export const STUB_READINGS = [] as import('@/types/protocolTypes').MultimeterReading[];
+export const STUB_DUTS = [] as import('@/types/commTypes').Dut[];
+export const STUB_READINGS = [] as import('@/types/commTypes').MultimeterReading[];

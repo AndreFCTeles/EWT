@@ -1,4 +1,4 @@
-//does this thing talk lmao
+//does this thing even talk lmao
 
 use serde::Serialize;
 use std::{
@@ -31,11 +31,19 @@ pub fn list_ports() -> Vec<String> {
 
 #[tauri::command]
 pub fn connect(state: State<SerialState>, port_name: String, baud: u32) -> Result<(), String> {
-    let port = serialport::new(port_name, baud)
+    eprintln!(
+        "[TAURI/COMM] connect requested: port={}, baud={}",
+        port_name, baud
+    );
+    let port = serialport::new(&port_name, baud)
         .timeout(Duration::from_millis(100))
         .open()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            eprintln!("[TAURI/COMM] failed to open {}: {}", &port_name, e);
+            e.to_string()
+        })?;
     *state.port.lock().unwrap() = Some(port);
+    eprintln!("[TAURI/COMM] port {} opened", &port_name);
     Ok(())
 }
 
@@ -43,55 +51,6 @@ pub fn connect(state: State<SerialState>, port_name: String, baud: u32) -> Resul
 pub fn close(state: State<SerialState>) {
     *state.port.lock().unwrap() = None;
 }
-
-/*
-#[tauri::command]
-pub fn test_roundtrip(
-    state: State<SerialState>,
-    // what to send (defaults to "HELLO\n")
-    payload: Option<String>,
-    // how long to listen after send, in ms (defaults to 500)
-    duration_ms: Option<u64>,
-) -> Result<Roundtrip, String> {
-    let msg = payload.unwrap_or_else(|| "HELLO\n".to_string());
-    let listen_for = Duration::from_millis(duration_ms.unwrap_or(500));
-
-    let mut guard = state.port.lock().unwrap();
-    let port = guard.as_mut().ok_or("Port not open")?;
-
-    // (Optional) drain any leftover bytes
-    let mut junk = [0u8; 256];
-    while let Ok(n) = port.read(&mut junk) {
-        if n == 0 {
-            break;
-        }
-    }
-
-    // Write the message
-    port.write_all(msg.as_bytes()).map_err(|e| e.to_string())?;
-    let _ = port.flush();
-
-    // Read until timeout window elapses
-    let start = Instant::now();
-    let mut buf: Vec<u8> = Vec::new();
-    let mut tmp = [0u8; 512];
-    while start.elapsed() < listen_for {
-        match port.read(&mut tmp) {
-            Ok(n) if n > 0 => buf.extend_from_slice(&tmp[..n]),
-            Ok(_) => {}
-            Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
-            Err(e) => return Err(e.to_string()),
-        }
-    }
-
-    Ok(Roundtrip {
-        sent_ascii: msg.clone(),
-        sent_hex: to_hex(msg.as_bytes()),
-        recv_hex: to_hex(&buf),
-        recv_ascii: to_ascii_pretty(&buf),
-    })
-}
-*/
 
 // Send TEXT (UTF-8) and listen
 #[tauri::command]
@@ -112,6 +71,11 @@ pub fn test_roundtrip_bytes(
     duration_ms: Option<u64>,
 ) -> Result<Roundtrip, String> {
     let listen_for = Duration::from_millis(duration_ms.unwrap_or(500));
+    eprintln!(
+        "[TAURI/COMM] roundtrip_bytes: len={}, window={}ms",
+        data.len(),
+        listen_for.as_millis()
+    );
     let mut guard = state.port.lock().unwrap();
     let port = guard.as_mut().ok_or("Port not open")?;
 
@@ -140,6 +104,10 @@ pub fn test_roundtrip_bytes(
         }
     }
 
+    eprintln!(
+        "[TAURI/COMM] roundtrip_bytes done: sent={:?} recv={:?}",
+        data, buf
+    );
     Ok(Roundtrip {
         sent_bytes: data.clone(),
         recv_bytes: buf.clone(),

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import { probeConnectedLB } from '@utils/hardware';//, lookupProductByHwId
-//import { productToDut } from '@utils/dut';
+import { probeConnectedLB } from '@utils/hardware';
 import { nowIso } from '@utils/generalUtils';
 
 
@@ -12,14 +11,13 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complet
       let cancelled = false;
 
       (async () => {
-         const startedAt = nowIso();
          const probe = await probeConnectedLB();
          if (cancelled) return;
 
          if (!probe.connected) {
             complete({ 
                id, 
-               startedAt, 
+               startedAt: nowIso(), 
                endedAt: nowIso(), 
                verdict: 'warn', 
                notes: ['Banca de carga não conectada'] 
@@ -54,7 +52,18 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ({ id, isActive, complet
             productData: dbproduct 
          });
             */
+         // TODO: stash probe.portName / probeData into pipeline 
+         complete({
+            id,
+            startedAt: nowIso(), 
+            endedAt: nowIso(),
+            verdict: 'pass',
+            notes: [`Banca de carga: ${probe.bank_no ?? "desconhecida"}`],
+         }, {
+            loadBank: probe, // or portName only, whatever your runtime vars expect
+         });
       })();
+      
       return () => { cancelled = true; };
 
    }, [id, isActive, complete]);

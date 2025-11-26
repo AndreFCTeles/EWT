@@ -17,15 +17,7 @@ import {
    Divider,
 } from "@mantine/core";
 import { invoke } from "@tauri-apps/api/core";
-
-type Roundtrip = {
-   sent_bytes: number[];
-   recv_bytes: number[];
-   sent_hex: string;
-   recv_hex: string;
-   sent_ascii: string;
-   recv_ascii: string;
-};
+import { Roundtrip } from "@/types/commTypes";
 
 type Props = {
    defaultPort?: string;   // e.g. "COM5"
@@ -139,17 +131,17 @@ const SerialInspectorMini: React.FC<Props> = ({
       setRound(null);
       setStatus("Connecting…");
       try {
-         await invoke("connect", { portName: port, baud });
+         await invoke("connect", { port_name: port, baud });
          setStatus("Sending…");
          const res =
             mode === "ASCII"
                ? await invoke<Roundtrip>("test_roundtrip_text", { 
                   text: input + (appendCR ? "\r" : "") + (appendLF ? "\n" : ""), 
-                  durationMs: listenMs 
+                  duration_ms: listenMs 
                })
                : await invoke<Roundtrip>("test_roundtrip_bytes", { 
                   data: inputBytes, 
-                  durationMs: listenMs 
+                  duration_ms: listenMs 
                });
          setRound(res);
          setStatus("Done");
