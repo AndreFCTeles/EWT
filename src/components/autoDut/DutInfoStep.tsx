@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { NumberInput, Select, Stack, TextInput } from '@mantine/core';
+import { Button, NumberInput, Select, Stack, TextInput } from '@mantine/core';
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import type { Submission } from '@/types/checklistTypes';
 import { nowIso } from '@utils/generalUtils';
 import { StepShell } from '../checklist/StepShell';
 
-export const DutInfoStep: React.FC<StepRuntimeProps> = ({
+export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
    id,
    role,
    canGoBack,
    goBack,
    submission,
    complete,
-}) => {
+} ) => {
    const initial = submission.dut ?? {
       prodName: '',
       brand: '',
@@ -93,6 +93,8 @@ export const DutInfoStep: React.FC<StepRuntimeProps> = ({
                onApplyChange('ratedCurrent', local.ratedCurrent); // placeholder; extend Dut type for ocv
                (local as any).ocv = ocv;
             }} />
+            <Button
+            onClick={onFinish}>continuar</Button>
          </Stack>
       </StepShell>
    );

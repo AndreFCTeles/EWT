@@ -7,13 +7,13 @@ import type { StepId } from '@/types/checklistTypes';
 
 // Steps
 import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPickSteps';
-import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
+//import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
-import { DetectLBStep } from '@/components/checklist/steps/DetectLBStep';
-import LoadBankCalibrationStep from './steps/LBCalStep';
+import { DetectLBStep } from '@steps/DetectLBStep';
+import LBCalStep from '@steps/LBCalStep';
 //import { DutSearchStep } from '@checklist/steps/DutSearchStep';
-//import { DutInfoStep } from '@checklist/steps/DutInfoStep';
+import { DutInfoStep } from '@/components/autoDut/DutInfoStep';
 
 
 
@@ -30,11 +30,11 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    pickProcedure:/*---------*/ProcedurePickerStep,
 
    dutSearch:/*-------------*/SkipStep, //DutSearchStep,
-   dut:/*-------------------*/SkipStep, //DutInfoStep, // nome dut, form com specs principais
 
    pickProcess:/*-----------*/PickProcessStep,
    pickPower:/*-------------*/PickPowerStep,
    pickBrand:/*-------------*/PickBrandStep,
+   dut:/*-------------------*/DutInfoStep, //DutInfoStep, // nome dut, form com specs principais //caso falhe identificações anteriores
 
    specs:/*-----------------*/SkipStep,
 
@@ -42,9 +42,9 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    connections:/*-----------*/SkipStep,//ConnectionsStep,
    selftests:/*-------------*/SkipStep,
    calstatus:/*-------------*/SkipStep,
-   calibration:/*-----------*/LoadBankCalibrationStep,
+   calibration:/*-----------*/LBCalStep,
 
-   ocv:/*-------------------*/OcvStep,
+   ocv:/*-------------------*/SkipStep,//OcvStep,
 
    'proc:MIGInv:nominals':/**/SkipStep,
    'proc:MIGInv:start':/*---*/SkipStep,
@@ -76,6 +76,6 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
 
 export const AUTO_COMPONENTS = new Set<React.FC<StepRuntimeProps>>([
    SkipStep,
-   DetectLBStep as React.FC<StepRuntimeProps>, // as unknown 
-   InterlocksStep as React.FC<StepRuntimeProps>,
+   DetectLBStep, // as unknown 
+   //InterlocksStep as React.FC<StepRuntimeProps>,
 ]);

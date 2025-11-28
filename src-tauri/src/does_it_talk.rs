@@ -9,7 +9,7 @@ use std::{
 use tauri::State;
 
 pub struct SerialState {
-    port: Mutex<Option<Box<dyn serialport::SerialPort>>>,
+    pub port: Mutex<Option<Box<dyn serialport::SerialPort>>>,
 }
 
 #[derive(Serialize)]

@@ -32,7 +32,7 @@ function toHex(bytes: number[]): string {
 // ───────────────────────────────────────────────────────────────────────────────
 /**
  * Scans all COM ports.
- * Returns Probe { connected, hwId, serial, portName? }.
+ * Returns Probe { connected, hw_id, serial, port_name? }.
  * Runs on startup
  */
 export async function probeConnectedLB(): Promise<LoadBankProbe> {
@@ -72,18 +72,18 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
 
 
 
-      const parsed = match.parsed;
-      const status: LoadBankStatus = { ...parsed, port_name };
+         const parsed = match.parsed;
+         const status: LoadBankStatus = { ...parsed, port_name };
 
-      console.log("[LB/HW] Load bank detected on", port_name, status);
+         console.log("[LB/HW] Load bank detected on", port_name, status);
 
-      return {
-         connected: true,
-         port_name,
-         status,
-         bank_power: parsed.bankPower,
-         bank_no: parsed.bankNo,
-      };
+         return {
+            connected: true,
+            port_name,
+            status,
+            bank_power: parsed.bankPower,
+            bank_no: parsed.bankNo,
+         };
 
       } catch (err) {
          //try { await invoke("close"); } catch { /* ignore */ }

@@ -148,20 +148,18 @@ const SerialInspectorMini: React.FC<Props> = ({
       } catch (e: any) {
          setStatus("ERROR");
          setStatusMsg(`${String(e)}`);
-      } finally {
+      } /*finally {
          await invoke("close").catch(() => {});
-      }
+      }*/
    }
 
    return (
       <>
-         <Title order={4}>
-            Serial Inspector (mini)
-         </Title>
-
-         <Text mb="sm" size="xs" c="dimmed" fw={400} lh={'xs'}>
-            Tip: close any other app using the same COM port before testing here.
-         </Text>
+         <Stack gap={0}>
+            <Title order={4} mb={0} pb={0}>Serial Inspector (mini)</Title>
+            <Text mb="sm" size="xs" c="dimmed" fw={400} lh={'xs'}
+            >Tip: close any other app using the same COM port before testing here.</Text>
+         </Stack>
 
          <Card withBorder radius="md">
             <SimpleGrid cols={1} spacing="sm" verticalSpacing="sm">

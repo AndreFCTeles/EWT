@@ -43,7 +43,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
          <Group mt="xs">
             {PROCESSES.map(p => (
                <Button key={p} onClick={() => pick(p)}>{
-                  p === "MIGConv" ? "MIG Conv" : 
+                  p === "MIGConv" ? "MIG Conv." : 
                   p === "MIGInv" ? "MIG Inverter" :
                   p 
                }</Button>

@@ -61,13 +61,16 @@ export function resolveLoadBankSetpoint(
 ): SetpointConfig {
    // TODO: use parsed "Load Bank - XXX" sheets + Banca Resistências 1000A.xlsx
    // For now: stub with a single "fake" mask.
+
+   console.log("[LB/SETPOINTS] resolveLoadBankSetpoint props: ", { id, process, bankType, targetCurrent });
+
    return {
       id,
       currentA: targetCurrent,
       options: [
          {
             mask: 0b0000_0000_0000_1111,
-            label: "Dummy combo R1+R2+R3+R4 (TBD)",
+            label: "",//"Dummy combo R1+R2+R3+R4 (TBD)",
             errorPercent: 1.2,
          },
       ],

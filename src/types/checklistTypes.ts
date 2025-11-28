@@ -6,8 +6,8 @@ import type { Tol } from "./generalTypes";
 
 
 //GENERAL
-export type Process = 'MMA'|'TIG'|'MIGConv'|'MIGInv';
-export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGConv', 'MIGInv'];
+export type Process = 'MMA'|'TIG'|'MIGInv'|'MIGConv';
+export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGInv', 'MIGConv'];
 export type RatedCurrent = 300|400|500|600|1000;
 export const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
 export type DeviceOrigin = 'db'|'manual'|'autodetect';
@@ -24,9 +24,9 @@ export type Verdict =
 // STEPS
 export type StepId =
    'detectPowerBank' | 'pickProcedure' 
-   | 'specs' | 'dutSearch' | 'dut'
+   | 'specs' | 'dutSearch'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
-   | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
+   | 'dut' | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
    | 'calibration' | 'ocv'
    | `proc:${Process}:nominals`
    | `proc:${Process}:start`
@@ -36,11 +36,11 @@ export type StepId =
    | `proc:${'MIGInv' | 'TIG'}:gas`
    | 'summary' | 'export';
 
-export const PIPELINE: StepId[] = [
+export const PIPELINE: StepId[] = [ // ordem
    'detectPowerBank', 'pickProcedure',
-   'specs', 'dutSearch',  'dut',
+   'specs', 'dutSearch',
    'pickProcess', 'pickPower', 'pickBrand',
-   'interlocks', 'connections', 'selftests', 'calstatus',
+   'dut', 'interlocks', 'connections', 'selftests', 'calstatus',
    'calibration','ocv',
    'proc:MIGInv:nominals', 'proc:MIGInv:start', 'proc:MIGInv:sweep', 'proc:MIGInv:pulse', 'proc:MIGInv:thermal', 'proc:MIGInv:gas',
    'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
