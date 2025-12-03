@@ -32,7 +32,7 @@ function toHex(bytes: number[]): string {
 // ───────────────────────────────────────────────────────────────────────────────
 /**
  * Scans all COM ports.
- * Returns Probe { connected, hw_id, serial, port_name? }.
+ * Returns Probe { connected, hw_id, serial, portName? }.
  * Runs on startup
  */
 export async function probeConnectedLB(): Promise<LoadBankProbe> {
@@ -41,21 +41,21 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
    console.log("[LB/HW] Available ports:", ports);
    const baud = 115200;
 
-   for (const port_name of ports) {
+   for (const portName of ports) {
       try {
-         await invoke("connect", { port_name, baud });
+         await invoke("connect", { portName, baud });
 
          // Ask Tauri to just listen (no TX) for a short window.
          const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { 
             data: [], 
-            duration_ms: 500 
+            durationMs: 500 
          });
 
          await invoke("close").catch(() => {});
 
          const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
          if (!match) {
-            console.debug("[LB/HW] No valid LB frame on", port_name);
+            console.debug("[LB/HW] No valid LB frame on", portName);
             continue;
          }
 
@@ -66,20 +66,20 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
             connected: true,
             hwId: `LB-${parsed.bankPower}-${parsed.bankNo}`,
             serial: `LB-${parsed.bankNo}`,
-            port_name,
+            portName,
          } as Probe;
          */
 
 
 
          const parsed = match.parsed;
-         const status: LoadBankStatus = { ...parsed, port_name };
+         const status: LoadBankStatus = { ...parsed, portName };
 
-         console.log("[LB/HW] Load bank detected on", port_name, status);
+         console.log("[LB/HW] Load bank detected on", portName, status);
 
          return {
             connected: true,
-            port_name,
+            portName,
             status,
             bank_power: parsed.bankPower,
             bank_no: parsed.bankNo,
@@ -87,7 +87,7 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
 
       } catch (err) {
          //try { await invoke("close"); } catch { /* ignore */ }
-         console.warn("[LB/HW] Error probing port",port_name,"-", err);
+         console.warn("[LB/HW] Error probing port",portName,"-", err);
       }
    }
 
@@ -97,15 +97,15 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
 
 
 export async function setLoadBankContactors(opts: {
-   port_name: string;
+   portName: string;
    //baud?: number;
    lastStatus: LoadBankStatus; // to reuse version / bankPower / bankNo
    contactorsMask: number;     // 16-bit mask, C1..C16
 }): Promise<LoadBankStatus> {
    //if (!opts.baud) opts.baud = 115200;
-   const { port_name, lastStatus, contactorsMask } = opts; //baud
+   const { portName, lastStatus, contactorsMask } = opts; //baud
    console.log("[LB/HW] setLoadBankContactors", {
-      port_name,
+      portName,
       contactorsMask: `0x${contactorsMask.toString(16)}`,
    });
 
@@ -123,11 +123,11 @@ export async function setLoadBankContactors(opts: {
       otherErrors: 0,
    });
 
-   //await invoke("connect", { port_name: port_name, baud });
+   //await invoke("connect", { portName: portName, baud });
 
    const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", {
       data: Array.from(txFrame),
-      duration_ms: 200,
+      durationMs: 200,
    });
    
    console.debug("[LB/HW] Command sent_bytes:", roundtrip.sent_bytes);
@@ -146,13 +146,13 @@ export async function setLoadBankContactors(opts: {
 
    return {
       ...parsed,
-      port_name: opts.port_name,
+      portName: opts.portName,
       rawFrameHex: toHex(Array.from(raw)),
    };
    */
 
    const parsed = match.parsed;
-   const status: LoadBankStatus = { ...parsed, port_name };
+   const status: LoadBankStatus = { ...parsed, portName };
 
    if (status.errContactors || status.errFans || status.errThermals || status.otherErrors) {
       console.warn("[LB/HW] Load bank reported errors after command", status);
@@ -164,9 +164,9 @@ export async function setLoadBankContactors(opts: {
 }
 
 
-export async function readLoadBankStatusOnce(port_name: string, baud = 115200): Promise<LoadBankStatus | null> {
-   await invoke("connect", { port_name, baud });
-   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { data: [], duration_ms: 300 });
+export async function readLoadBankStatusOnce(portName: string, baud = 115200): Promise<LoadBankStatus | null> {
+   await invoke("connect", { portName, baud });
+   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { data: [], durationMs: 300 });
    await invoke("close").catch(() => {});
 
    const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
@@ -175,7 +175,7 @@ export async function readLoadBankStatusOnce(port_name: string, baud = 115200): 
    const { raw, parsed } = match;
    return {
       ...parsed,
-      port_name,
+      portName,
       rawFrameHex: toHex(Array.from(raw)),
    };
 }

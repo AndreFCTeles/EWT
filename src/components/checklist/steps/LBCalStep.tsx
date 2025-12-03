@@ -13,19 +13,14 @@ import type { Dut, Process, Verdict } from "@/types/checklistTypes";
 import type { LoadBankProbe, LoadBankStatus, SetpointConfig } from "@/types/commTypes";
 import SerialInspectorMini from "@/components/comm/SpeakFFS";
 
-/*
-type Props = {
-   dut: Dut;
-   process: Process;
-   port_name: string;      // from detection step
-   minCurrent: number;
-};
-*/
+
+
+
 
 const MIN_CURRENT_FOR_SWITCH = 0.5; // A
 
 
-//export const LoadBankCalibrationStep: React.FC<Props> = ({ dut, process, port_name, minCurrent }) => {
+//export const LoadBankCalibrationStep: React.FC<Props> = ({ dut, process, portName, minCurrent }) => {
 
 export const LBCalStep: React.FC<StepRuntimeProps> = ( {
    id,
@@ -55,56 +50,18 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
    // Min setpoint is editable here for MMA/TIG/MIGInv; ignored for MIGConv
    const [minSetpoint, setMinSetpoint] = useState<number | null>(null);
 
-   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(loadBank?.status ?? null);
+   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(loadBank?.connected ? loadBank?.status ?? null : null);
    const [setpoints, setSetpoints] = useState<SetpointConfig[]>([]);
    const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
    const [activeSetpointId, setActiveSetpointId] = useState<number | null>(null);
    const [optionIndices, setOptionIndices] = useState<Record<number, number>>({});
    const [busy, setBusy] = useState(false);
 
-   const port_name = loadBank?.port_name ?? "";
-   const isOffline = !bankStatus;
-
-   /*
-   const vars = submission.vars ?? {};
-   const dut = submission.dut as Dut | undefined;
-   const process = vars.selectedProcess as Process | undefined;
-   const loadBank = vars.loadBank as LoadBankProbe | undefined;
-
-   const [missing, setMissing] = useState(true);
-   if (!dut || !process || !loadBank || !loadBank.connected) {
-      console.warn("[LBCalStep] Missing prerequisites", {
-         hasDut: !!dut,
-         hasProcess: !!process,
-         hasLoadBank: !!loadBank,
-      });
-      setMissing(true);
-      return <Text>Faltam dados para calibrar (DuT, processo ou banca).</Text>;
-   }
-
-   const port_name = loadBank.port_name;
-   const maxRated = dut.ratedCurrent ?? 0;
-   const minRated = undefined; // eventually from a more detailed DuT type
+   const portName = loadBank?.connected ? loadBank?.portName ?? "" : "";
+   //const isOffline = !bankStatus;
 
 
-   if (!dut.ratedCurrent) {
-      console.log("erro - potência não introduzida");
-      return;
-   }
-   const maxRated = dut.ratedCurrent;
-   const [minSetpoint, setMinSetpoint] = useState<number>(() => {
-      if (process === "MIGConv") return Math.round(maxRated * 0.25); // 25% rule as default
-      return minCurrent ?? Math.round(maxRated * 0.25);
-   });
 
-   
-   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(loadBank.status);
-   const [setpoints, setSetpoints] = useState<SetpointConfig[]>([]);
-   const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
-   const [activeSetpointId, setActiveSetpointId] = useState<number | null>(null);
-   const [busy, setBusy] = useState(false);
-   const [optionIndices, setOptionIndices] = useState<Record<number, number>>({});
-   */
 
 
    // ---- Initial min setpoint heuristic ----
@@ -121,17 +78,17 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
 
    // Start polling when component mounts
    useEffect(() => {
-      if (!port_name) return;
+      if (!portName) return;
 
       const controller = new AbortController();
       startLoadBankPolling(
-         port_name, 
+         portName, 
          s => setBankStatus(s), 
          controller.signal
       ).catch((err) => console.error("[LBCalStep] polling error", err));
 
       return () => { controller.abort(); };
-   }, [port_name]);
+   }, [portName]);
 
    // ---- Recompute setpoints whenever process / min / max changes ----
    useEffect(() => {
@@ -162,96 +119,6 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
 
 
 
-
-
-
-
-
-   // Recompute setpoints whenever min/max changes - old
-   /*
-   useEffect(() => {
-      if (!maxRated) return;
-      const currents = generateSetpointsForProcess(process, minRated, maxRated, 4);
-      const configs = currents.map((currentA, idx) =>
-         resolveLoadBankSetpoint(idx + 1, process, "1000A", currentA)
-      );
-      setSetpoints(configs);
-      setPendingSetpointId(null);
-      setActiveSetpointId(null);
-   }, [process, minRated, maxRated]);
-   */
-   /*
-   useEffect(() => {
-      if (!maxRated || !minSetpoint) return;
-      if (maxRated <= 0 || minSetpoint < 0) return;
-      const currents = generateSetpointsForProcess(process, minSetpoint, maxRated, 4);
-      const configs = currents.map((currentA: number, idx: number) =>
-         resolveLoadBankSetpoint(idx + 1, process, "1000A", currentA) // choose bank type
-      );
-      setSetpoints(configs);
-      setOptionIndices({});
-      setActiveSetpointId(null);
-   }, [minSetpoint, maxRated, process]);
-   */
-
-   //const isOffline = !bankStatus;
-/*
-   async function handleSetpointClick(sp: SetpointConfig) {
-      if (!bankStatus) return;
-      const currentMeas = bankStatus.contactorsMask === 0 ? 0 : undefined; 
-      // ↑ your real measured current comes from meter, not from this frame.
-      // Substitute with actual value from your measurement pipeline.
-
-      if (currentMeas !== undefined && Math.abs(currentMeas) > MIN_CURRENT_FOR_SWITCH) {
-         // show some notification instead of alert in your real app
-         alert("Não é permitido mudar de ponto enquanto há corrente. Reduza a corrente para 0 A.");
-         return;
-      }
-
-      const options = sp.options;
-      if (!options.length) return;
-
-      const currentIdx = optionIndices[sp.id] ?? -1;
-      const nextIdx = (currentIdx + 1) % options.length;
-      const nextOption = options[nextIdx];
-
-      setBusy(true);
-      try {
-         // MMA: all-off first
-         if (process === "MMA") {
-         await setLoadBankContactors({
-            port_name,
-            lastStatus: bankStatus,
-            contactorsMask: 0x0000,
-         });
-         // optional: wait for status update here
-         }
-
-         const newStatus = await setLoadBankContactors({
-            port_name,
-            lastStatus: bankStatus,
-            contactorsMask: nextOption.mask,
-         });
-
-         setBankStatus({ ...newStatus, port_name });
-         setActiveSetpointId(sp.id);
-         setOptionIndices(prev => ({ ...prev, [sp.id]: nextIdx }));
-      } catch (e) {
-         console.error(e);
-         alert("Falha ao comunicar com a banca de carga.");
-      } finally {
-         setBusy(false);
-      }
-   }
-      */
-
-
-
-
-
-
-
-
    // ---- Select setpoint (pending) & cycle combination options ----
    async function handleSetpointClick(sp: SetpointConfig) {
       setPendingSetpointId(sp.id);
@@ -266,7 +133,7 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       setOptionIndices((prev) => ({ ...prev, [sp.id]: nextIdx }));
 
       // If we don't have a connected bank, stop here (UI-only behaviour)
-      if (!hasLoadBank || !bankStatus || !port_name) return;
+      if (!hasLoadBank || !bankStatus || !portName) return;
 
       // Safety: ensure contactors are OFF while operator is preparing this point
       setBusy(true);
@@ -285,12 +152,12 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
          }
 
          const offStatus = await setLoadBankContactors({
-            port_name,
+            portName,
             lastStatus: bankStatus,
             contactorsMask: 0x0000,
          });
 
-         setBankStatus({ ...offStatus, port_name });
+         setBankStatus({ ...offStatus, portName });
          setActiveSetpointId(null);
       } catch (e) {
          console.error("[LBCalStep] error setting OFF for pending point", e);
@@ -305,7 +172,7 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
    
    // ---- Apply load for the currently pending setpoint (activate) ----
    async function handleApplyLoad() {
-      if (!hasLoadBank || !bankStatus || !port_name) return;
+      if (!hasLoadBank || !bankStatus || !portName) return;
       if (pendingSetpointId == null) {
          alert("Selecione primeiro um ponto de calibração.");
          return;
@@ -322,20 +189,20 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
          // MMA: optionally force all OFF before changing contactors
          if (process === "MMA") {
             const offStatus = await setLoadBankContactors({
-               port_name,
+               portName,
                lastStatus: bankStatus,
                contactorsMask: 0x0000,
             });
-            setBankStatus({ ...offStatus, port_name });
+            setBankStatus({ ...offStatus, portName });
          }
 
          const newStatus = await setLoadBankContactors({
-            port_name,
+            portName,
             lastStatus: bankStatus,
             contactorsMask: opt.mask,
          });
 
-         setBankStatus({ ...newStatus, port_name });
+         setBankStatus({ ...newStatus, portName });
          setActiveSetpointId(sp.id);
       } catch (e) {
          console.error("[LBCalStep] error applying load", e);

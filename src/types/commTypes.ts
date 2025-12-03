@@ -46,7 +46,7 @@ export type LoadBankFrame = {
 };
 
 export type LoadBankStatus = LoadBankFrame & {
-   port_name: string;
+   portName: string;
    rawFrameHex?: string;
 };
 
@@ -119,13 +119,13 @@ export type Probe = {
    connected: boolean;
    hwId?: string;
    serial?: string;
-   port_name?: string;
+   portName?: string;
 }
 export type LoadBankProbe =
    | { connected: false }
    | {
          connected: true;
-         port_name: string;
+         portName: string;
          status: LoadBankStatus;
          bank_power: number;
          bank_no: number;
@@ -227,17 +227,43 @@ export type DutProfile = {
 
 // ------ CALIBRATION ------
 export type CalibrationSetpoint = {
-   id: number;          // 1..4
-   currentA: number;    // target current
+   id: number;                // 1..4
+   currentA: number;          // target current
    // future: targetVoltage, wireSpeed, etc.
 };
 
 export type ContactorOption = {
-   mask: number;        // 16-bit mask, C1..C16
-   label: string;       // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
-   errorPercent: number;// |I_actual - I_target| / I_target * 100
+   mask: number;              // 16-bit mask, C1..C16
+   label: string;             // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
+   errorPercent: number;      // |I_actual - I_target| / I_target * 100
 };
 
 export type SetpointConfig = CalibrationSetpoint & {
    options: ContactorOption[];
+};
+
+export type LoadBankBranch = {
+   id: "R1" | "R2" | "R3" | "R4" | "R5" | "R6" | "R7" | "R8";
+   ohm: number;
+   maxKw: number;
+   maskBit: number;           // which bit in contactorsMask corresponds to this branch
+};
+
+export const LB_BRANCHES: LoadBankBranch[] = [
+   { id: "R1", ohm: 4.28, maxKw: 4.0, maskBit: 1 << 0 },
+   { id: "R2", ohm: 2.0,  maxKw: 4.0, maskBit: 1 << 1 },
+   { id: "R3", ohm: 1.0,  maxKw: 4.0, maskBit: 1 << 2 },
+   { id: "R4", ohm: 0.5,  maxKw: 4.0, maskBit: 1 << 3 },
+   { id: "R5", ohm: 0.36, maxKw: 4.0, maskBit: 1 << 4 },
+   { id: "R6", ohm: 0.36, maxKw: 4.0, maskBit: 1 << 5 },
+   { id: "R7", ohm: 0.23, maxKw: 4.0, maskBit: 1 << 6 },
+   { id: "R8", ohm: 0.23, maxKw: 4.0, maskBit: 1 << 7 },
+];
+
+export type ComboCandidate = {
+  mask: number;                 // contactors mask for this combo
+  branches: LoadBankBranch[];   // which resistors are on
+  reqOhm: number;               // equivalent resistance
+  approxCurrentA: number;       // current delivered at U2
+  relErrorCurrent: number;      // |I_actual - I_target| / I_target
 };

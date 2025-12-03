@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { CRC8_TABLE, LoadBankFrame, LoadBankStatus, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
+import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 
 
@@ -142,13 +143,13 @@ export function findFirstLoadBankFrame(raw: number[] | Uint8Array): {
 
 
 export async function startLoadBankPolling(
-   port_name: string,
+   portName: string,
    onStatus: (s: LoadBankStatus) => void,
    abortSignal: AbortSignal,
-   baud = 115200
+   baud = DEV_ECHO_BAUD
 ) {
-   console.log("[LB] startLoadBankPolling", { port_name, baud });
-   await invoke("connect", { port_name, baud });
+   console.log("[LB] startLoadBankPolling", { portName, baud });
+   await invoke("connect", { portName, baud });
 
    const loop = async () => {
       while (!abortSignal.aborted) {
@@ -158,7 +159,7 @@ export async function startLoadBankPolling(
                sent_bytes: number[];
             }>("test_roundtrip_bytes", {
                data: [],          // just listen
-               duration_ms: 200,
+               durationMs: 200,
             });
 
             if (roundtrip.recv_bytes.length) {
@@ -168,7 +169,7 @@ export async function startLoadBankPolling(
             if (match) {
                onStatus({
                   ...match.parsed,
-                  port_name,
+                  portName,
                });
             }
          } catch (e) {
@@ -176,7 +177,7 @@ export async function startLoadBankPolling(
             // Optionally mark as offline here
             await invoke("close").catch(() => {});
          }
-         await new Promise(r => setTimeout(r, 300));
+         //await new Promise(r => setTimeout(r, 300));
       }
       console.log("[LB] polling loop stopped (abortSignal)");
    };
@@ -193,14 +194,14 @@ export async function commTest() {
    const ports = await invoke<string[]>("list_ports");
    console.log("Ports:", ports);
 
-   await invoke("connect", { port_name: "COM5", baud: 115200 });
+   await invoke("connect", { portName: DEV_ECHO_PORT, baud: DEV_ECHO_BAUD });
 
    const res = await invoke<{
       sent_ascii: string;
       sent_hex: string;
       recv_hex: string;
       recv_ascii: string;
-   }>("test_roundtrip_text", { payload: "ABC 123\r\n", duration_ms: 500 });
+   }>("test_roundtrip_text", { payload: "ABC 123\r\n", durationMs: DEV_ECHO_DELAY });
 
    console.log("Sent ASCII:", res.sent_ascii);
    console.log("Sent HEX  :", res.sent_hex);

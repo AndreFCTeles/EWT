@@ -8,8 +8,8 @@ import type { Tol } from "./generalTypes";
 //GENERAL
 export type Process = 'MMA'|'TIG'|'MIGInv'|'MIGConv';
 export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGInv', 'MIGConv'];
-export type RatedCurrent = 300|400|500|600|1000;
-export const POWERS: RatedCurrent[] = [300, 400, 500, 600, 1000];
+export type RatedCurrent = 300|350|400|500|600|1000;
+export const POWERS: RatedCurrent[] = [300, 350, 400, 500, 600, 1000];
 export type DeviceOrigin = 'db'|'manual'|'autodetect';
 export type Unit = 'V'|'A'|'Ω'|'°C'|'mV'|'mA'|'kΩ'|'%';
 export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';

@@ -3,84 +3,10 @@ import type { StepRuntimeProps } from '@checklist/pipeline';
 import { probeConnectedLB } from '@utils/hardware';
 import { nowIso } from '@utils/generalUtils';
 import type { LoadBankProbe, LoadBankStatus } from '@/types/commTypes';
+import { DEV_ECHO_ENABLED, DEV_ECHO_PORT, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from '@/dev/devConfig'
 
 
-/*
-export const DetectLBStep: React.FC<StepRuntimeProps> = ( { 
-   id, 
-   isActive, 
-   complete 
-} ) => {
-   useEffect(() => {
-      if (!isActive) return;
-      let cancelled = false;
 
-      (async () => {
-         const probe = await probeConnectedLB();
-         if (cancelled) return;
-
-         if (!probe.connected) {
-            complete({ 
-               id, 
-               startedAt: nowIso(), 
-               endedAt: nowIso(), 
-               verdict: 'warn', 
-               notes: ['Banca de carga não conectada'] 
-            });
-            return;
-         }
-
-         const dbproduct = probe.hwId ? await lookupProductByHwId(probe.hwId) : null;
-         if (cancelled) return;
-
-         if (!dbproduct) {
-            complete({ 
-               id, 
-               startedAt, 
-               endedAt: nowIso(), 
-               verdict: 'warn', 
-               notes: ['DuT não encontrado na BD'] 
-            });
-            return;
-         }
-
-         const dut = productToDut(dbproduct, 'db');
-
-         complete({ 
-            id, 
-            startedAt, 
-            endedAt: nowIso(), 
-            verdict: 'pass' 
-         }, { 
-            dut, 
-            productData: dbproduct 
-         });
-
-
-         // TODO: stash probe.portName / probeData into pipeline 
-         complete({
-            id,
-            startedAt: nowIso(), 
-            endedAt: nowIso(),
-            verdict: 'pass',
-            notes: [`Banca de carga: ${probe.bank_no ?? "desconhecida"}`],
-         }, {
-            loadBank: probe.connected ? probe : null, // or portName only, whatever your runtime vars expect
-         });
-      })();
-      
-      return () => { cancelled = true; };
-
-   }, [id, isActive, complete]);
-
-   return null; // no UI = auto step
-};
-*/
-
-const DEV_ECHO_ENABLED = true; 
-const DEV_ECHO_PORT = "COM5";
-const DEV_ECHO_POWER = 1000;
-const DEV_ECHO_BANK_NO = 1;
 
 
 
@@ -142,13 +68,13 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                errFans: 0,
                errThermals: 0,
                otherErrors: 0,
-               port_name: DEV_ECHO_PORT,
+               portName: DEV_ECHO_PORT,
                rawFrameHex: "",
             };
 
             const devProbe: LoadBankProbe = {
                connected: true,
-               port_name: DEV_ECHO_PORT,
+               portName: DEV_ECHO_PORT,
                status: devStatus,
                bank_power: DEV_ECHO_POWER,
                bank_no: DEV_ECHO_BANK_NO,
@@ -160,12 +86,8 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                   startedAt: nowIso(),
                   endedAt: nowIso(),
                   verdict: "pass",
-                  commanded: {
-                     action: "probe_load_bank_dev_echo",
-                  },
-                  notes: [
-                     `DEV: placa shunt usada como banca na porta ${DEV_ECHO_PORT}.`,
-                  ],
+                  commanded: { action: "probe_load_bank_dev_echo" },
+                  notes: [ `DEV: placa shunt usada como banca na porta ${DEV_ECHO_PORT}.` ],
                },
                {
                   loadBank: devProbe,
@@ -198,7 +120,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                   action: "probe_load_bank",
                },
                notes: [
-                  `Banca ${probe.bank_power}A #${probe.bank_no} detetada na porta ${probe.port_name}.`,
+                  `Banca ${probe.bank_power}A #${probe.bank_no} detetada na porta ${probe.portName}.`,
                ],
             }, {
                loadBank: probe,     // goes into submission.vars.loadBank

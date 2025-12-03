@@ -1,0 +1,339 @@
+{
+   "resistors": {
+      "R1": {
+         "ohm": 4.28,
+         "maxKw": 4.0
+      },
+      "R2": {
+         "ohm": 2.0,
+         "maxKw": 4.0
+      },
+      "R3": {
+         "ohm": 1.0,
+         "maxKw": 4.0
+      },
+      "R4": {
+         "ohm": 0.5,
+         "maxKw": 4.0
+      },
+      "R5": {
+         "ohm": 0.36,
+         "maxKw": 4.0
+      },
+      "R6": {
+         "ohm": 0.36,
+         "maxKw": 4.0
+      },
+      "R7": {
+         "ohm": 0.23,
+         "maxKw": 4.0
+      },
+      "R8": {
+         "ohm": 0.23,
+         "maxKw": 4.0
+      }
+   },
+   "processTables": {
+      "MMA": {
+         "u2Formula": "U2 = 0.04 * I2 + 20",
+         "rows": [
+            {
+               "i2": 10,
+               "u2": 20.40,
+               "idealR": 2.040,
+               "reqR": 2.0000,
+               "errR": -0.0196,
+               "errPercent": "-2.0%",
+               "combo": [
+                  "R2"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R2": {
+                     "currentA": 10.0000,
+                     "powerKw": 0.20
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            },
+            {
+               "i2": 15,
+               "u2": 20.60,
+               "idealR": 1.373,
+               "reqR": 1.3631,
+               "errR": -0.0075,
+               "errPercent": "-0.7%",
+               "combo": [
+                  "R1",
+                  "R2"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 4.7771,
+                     "powerKw": 0.10
+                  },
+                  "R2": {
+                     "currentA": 10.2229,
+                     "powerKw": 0.21
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            },
+            {
+               "i2": 75,
+               "u2": 23.00,
+               "idealR": 0.307,
+               "reqR": 0.3051,
+               "errR": -0.0051,
+               "errPercent": "-0.5%",
+               "combo": [
+                  "R2",
+                  "R5"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R2": {
+                     "currentA": 11.4407,
+                     "powerKw": 0.26
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 63.5593,
+                     "powerKw": 1.45
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            },
+            {
+               "i2": 80,
+               "u2": 23.20,
+               "idealR": 0.290,
+               "reqR": 0.2857,
+               "errR": -0.0148,
+               "errPercent": "-1.5%",
+               "combo": [
+                  "R2",
+                  "R3",
+                  "R4"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R2": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            }
+            /* copy/paste this object for each MMA row and replace
+            i2, u2, idealR, reqR, errR, errPercent,
+            combo[], branch.* and unsafe with the real values
+            from the Excel MMA table */
+         ]
+      },
+      "MIG": {
+         "u2Formula": "U2 = 0.05 * I2 + 14",
+         "rows": [
+            {
+               "i2": 0,
+               "u2": 0,
+               "idealR": 0,
+               "reqR": 0,
+               "errR": 0,
+               "errPercent": 0,
+               "combo": [
+                  "R1"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R2": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            }
+            /* one object per MIG row */
+         ]
+      },
+      "TIG": {
+         "u2Formula": "U2 = 0.04 * I2 + 10",
+         "rows": [
+            {
+               "i2": 0,
+               "u2": 0,
+               "idealR": 0,
+               "reqR": 0,
+               "errR": 0,
+               "errPercent": 0,
+               "combo": [
+                  "R1"
+               ],
+               "branch": {
+                  "R1": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R2": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R3": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R4": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R5": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R6": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R7": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  },
+                  "R8": {
+                     "currentA": 0,
+                     "powerKw": 0
+                  }
+               },
+               "unsafe": false
+            }
+            /* one object per TIG row */
+         ]
+      }
+   }
+}

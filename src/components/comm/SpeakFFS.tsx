@@ -18,6 +18,7 @@ import {
 } from "@mantine/core";
 import { invoke } from "@tauri-apps/api/core";
 import { Roundtrip } from "@/types/commTypes";
+import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 type Props = {
    defaultPort?: string;   // e.g. "COM5"
@@ -89,9 +90,9 @@ function bytesPreviewTable(title: string, data: number[]) {
 }
 
 const SerialInspectorMini: React.FC<Props> = ({
-   defaultPort = "COM5",
-   defaultBaud = 115200,
-   listenMs = 500,
+   defaultPort = DEV_ECHO_PORT,
+   defaultBaud = DEV_ECHO_BAUD,
+   listenMs = DEV_ECHO_DELAY,
 }) => {
    const [ports, setPorts] = useState<string[]>([]);
    const [port, setPort] = useState(defaultPort);
@@ -131,17 +132,17 @@ const SerialInspectorMini: React.FC<Props> = ({
       setRound(null);
       setStatus("Connecting…");
       try {
-         await invoke("connect", { port_name: port, baud });
+         await invoke("connect", { portName: port, baud });
          setStatus("Sending…");
          const res =
             mode === "ASCII"
                ? await invoke<Roundtrip>("test_roundtrip_text", { 
                   text: input + (appendCR ? "\r" : "") + (appendLF ? "\n" : ""), 
-                  duration_ms: listenMs 
+                  durationMs: listenMs 
                })
                : await invoke<Roundtrip>("test_roundtrip_bytes", { 
                   data: inputBytes, 
-                  duration_ms: listenMs 
+                  durationMs: listenMs 
                });
          setRound(res);
          setStatus("Done");

@@ -1,0 +1,94 @@
+{
+   "resistors": {
+      "R1": { "ohm": 4.28, "maxKw": 4.0 },
+      "R2": { "ohm": 2.0,  "maxKw": 4.0 },
+      "R3": { "ohm": 1.0,  "maxKw": 4.0 },
+      "R4": { "ohm": 0.5,  "maxKw": 4.0 },
+      "R5": { "ohm": 0.36, "maxKw": 4.0 },
+      "R6": { "ohm": 0.36, "maxKw": 4.0 },
+      "R7": { "ohm": 0.23, "maxKw": 4.0 },
+      "R8": { "ohm": 0.23, "maxKw": 4.0 }
+   },
+
+   "processTables": {
+      "MMA": {
+         "u2Formula": "U2 = 0.04 * I2 + 20",
+         "rows": [
+            {
+               "i2": 0,
+               "u2": 0,
+               "idealR": 0,
+               "reqR": 0,
+               "errR": 0,
+               "errPercent": 0,
+               "combo": ["R1"],
+
+               "branch": {
+                  "R1": { "currentA": 0, "powerKw": 0 },
+                  "R2": { "currentA": 0, "powerKw": 0 },
+                  "R3": { "currentA": 0, "powerKw": 0 },
+                  "R4": { "currentA": 0, "powerKw": 0 },
+                  "R5": { "currentA": 0, "powerKw": 0 },
+                  "R6": { "currentA": 0, "powerKw": 0 },
+                  "R7": { "currentA": 0, "powerKw": 0 },
+                  "R8": { "currentA": 0, "powerKw": 0 }
+               },
+
+               "unsafe": false
+            }
+         ]
+      },
+
+      "MIG": {
+         "u2Formula": "U2 = 0.05 * I2 + 14",
+         "rows": [
+            {
+               "i2": 0,
+               "u2": 0,
+               "idealR": 0,
+               "reqR": 0,
+               "errR": 0,
+               "errPercent": 0,
+               "combo": ["R1"],
+               "branch": {
+                  "R1": { "currentA": 0, "powerKw": 0 },
+                  "R2": { "currentA": 0, "powerKw": 0 },
+                  "R3": { "currentA": 0, "powerKw": 0 },
+                  "R4": { "currentA": 0, "powerKw": 0 },
+                  "R5": { "currentA": 0, "powerKw": 0 },
+                  "R6": { "currentA": 0, "powerKw": 0 },
+                  "R7": { "currentA": 0, "powerKw": 0 },
+                  "R8": { "currentA": 0, "powerKw": 0 }
+               },
+               "unsafe": false
+            }
+         ]
+      },
+
+      "TIG": {
+         "u2Formula": "U2 = 0.04 * I2 + 10",
+         "rows": [
+            {
+               "i2": 0,
+               "u2": 0,
+               "idealR": 0,
+               "reqR": 0,
+               "errR": 0,
+               "errPercent": 0,
+               "combo": ["R1"],
+               "branch": {
+                  "R1": { "currentA": 0, "powerKw": 0 },
+                  "R2": { "currentA": 0, "powerKw": 0 },
+                  "R3": { "currentA": 0, "powerKw": 0 },
+                  "R4": { "currentA": 0, "powerKw": 0 },
+                  "R5": { "currentA": 0, "powerKw": 0 },
+                  "R6": { "currentA": 0, "powerKw": 0 },
+                  "R7": { "currentA": 0, "powerKw": 0 },
+                  "R8": { "currentA": 0, "powerKw": 0 }
+               },
+               "unsafe": false
+            }
+         ]
+      }
+   }
+}
