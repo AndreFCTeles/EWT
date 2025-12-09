@@ -21,3 +21,5 @@ export function serialToFormatDate(value: number | string | undefined) {
    const d = excelSerialToDayjs(value);
    return d.isValid() ? d.format("DD-MM-YYYY") : null;
 }
+
+export const roundTo5 = (value: number): number => Math.round(value / 5) * 5;

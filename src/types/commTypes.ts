@@ -183,15 +183,15 @@ export type ApiResponse<T>=ApiOk<T>|ApiErr;
 
 
 // ------ DUT ------
-export type DutProfileOrigin = 'profile' | 'product';// | string;
+export type DutProfileOrigin = 'profile' | 'product';    // | string;
 
-export type DutProfileKey = string; // e.g. brand::prodName::series::catPath
+export type DutProfileKey = string;                      // e.g. brand::prodName::series::catPath
 
 export type DutProfile = {
-   origin: DutProfileOrigin;  // 'profile' from Perfis or 'product' from Produtos
-   sourceId: string;          // Perfis._id or Produtos._id
+   origin: DutProfileOrigin;                             // 'profile' from Perfis or 'product' from Produtos
+   sourceId: string;                                     // Perfis._id or Produtos._id
 
-   dutSnapshot: Dut;            // canonical DuT view
+   dutSnapshot: Dut;                                     // canonical DuT view
    productId?: string;
    productSnapshot?: ProductData;
    /*
@@ -201,23 +201,23 @@ export type DutProfile = {
    series?: string;
 
    // Category path
-   categoryMain?: string;     // 'maq'
-   categorySub?: string;      // 'maq-mig', 'maq-tig', 'maq-mma', ...
-   categorySubSub?: string;   // 'maq-mig-bas', etc.
-   format?: string;           // 'maq-mig-f-com', 'maq-mig-f-mod', ...
+   categoryMain?: string;                                // 'maq'
+   categorySub?: string;                                 // 'maq-mig', 'maq-tig', 'maq-mma', ...
+   categorySubSub?: string;                              // 'maq-mig-bas', etc.
+   format?: string;                                      // 'maq-mig-f-com', 'maq-mig-f-mod', ...
    */
 
 
    // Useful derived fields
-   key: string;                 // brand::prodName::series::catPath
+   key: string;                                          // brand::prodName::series::catPath
    supply?: { 
       phases: number; 
       voltage: number; 
       freqHz: number 
-   };                         // from "3x400" etc
-   ocv?: number | null;       // Open Circuit Voltage / Tensão de vazio
+   };                                                    // from "3x400" etc
+   ocv?: number | null;                                  // Open Circuit Voltage / Tensão de vazio
 
-   updatedAt?: string;        // ISO, from Perfis.updatedDate or Produtos.updatedDate
+   updatedAt?: string;                                   // ISO, from Perfis.updatedDate or Produtos.updatedDate
 };
 
 
@@ -261,9 +261,10 @@ export const LB_BRANCHES: LoadBankBranch[] = [
 ];
 
 export type ComboCandidate = {
-  mask: number;                 // contactors mask for this combo
-  branches: LoadBankBranch[];   // which resistors are on
-  reqOhm: number;               // equivalent resistance
-  approxCurrentA: number;       // current delivered at U2
-  relErrorCurrent: number;      // |I_actual - I_target| / I_target
+   mask: number;                 // contactors mask for this combo
+   branches: LoadBankBranch[];   // which resistors are on
+   reqOhm: number;               // equivalent resistance
+   approxCurrentA: number;       // current delivered at U2
+   relErrCurrent: number;        // |I_actual - I_target| / I_target
+   relErrAbs: number;            // signed: + means I_actual > I_target, - means I_actual < I_target
 };

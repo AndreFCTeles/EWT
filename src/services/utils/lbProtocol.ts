@@ -14,11 +14,10 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 
 
-
-function crc8LoadBank(frame: Uint8Array): number {
    // mirror CRC_Calculator(message++, 13):
    // - "size" = 13  => loop i = 1..12 inclusive
    // - frame[0] is start; frame[14] is CRC; frame[15] is stop
+function crc8LoadBank(frame: Uint8Array): number {
    if (frame.length < 13) throw new Error("frame too short for CRC");
    let crc = 0;
    for (let i = 1; i < 13; i++) {
@@ -159,7 +158,7 @@ export async function startLoadBankPolling(
                sent_bytes: number[];
             }>("test_roundtrip_bytes", {
                data: [],          // just listen
-               durationMs: 200,
+               durationMs: DEV_ECHO_DELAY,
             });
 
             if (roundtrip.recv_bytes.length) {
@@ -182,9 +181,7 @@ export async function startLoadBankPolling(
       console.log("[LB] polling loop stopped (abortSignal)");
    };
 
-   loop().catch((err) => {
-      console.error("[LB] polling loop crashed", err);
-   });
+   loop().catch((err) => { console.error("[LB] polling loop crashed", err); });
 }
 
 

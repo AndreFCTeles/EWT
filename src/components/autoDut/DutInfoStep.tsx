@@ -46,12 +46,12 @@ export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
 
    return (
       <StepShell
-         //id={id}
-         title="Confirmar detalhes do equipamento sob teste"
-         //role={role}
-         canGoBack={canGoBack}
-         onBack={goBack}
-         //onNext={onFinish}
+      //id={id}
+      title="Confirmar detalhes do equipamento sob teste"
+      //role={role}
+      canGoBack={canGoBack}
+      onBack={goBack}
+      //onNext={onFinish}
       >
          <Stack>
             <TextInput
@@ -93,8 +93,7 @@ export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
                onApplyChange('ratedCurrent', local.ratedCurrent); // placeholder; extend Dut type for ocv
                (local as any).ocv = ocv;
             }} />
-            <Button
-            onClick={onFinish}>continuar</Button>
+            <Button onClick={onFinish}>continuar</Button>
          </Stack>
       </StepShell>
    );

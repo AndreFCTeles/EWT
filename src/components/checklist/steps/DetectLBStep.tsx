@@ -45,9 +45,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                   "Erro ao tentar detetar a banca de carga.",
                   String(err),
                ],
-            }, {
-               loadBank: null,
-            });
+            }, { loadBank: null });
 
             return;
          }
@@ -119,9 +117,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                   // purely informational: "we asked to probe ports"
                   action: "probe_load_bank",
                },
-               notes: [
-                  `Banca ${probe.bank_power}A #${probe.bank_no} detetada na porta ${probe.portName}.`,
-               ],
+               notes: [ `Banca ${probe.bank_power}A #${probe.bank_no} detetada na porta ${probe.portName}.` ],
             }, {
                loadBank: probe,     // goes into submission.vars.loadBank
                "instruments.lbId": `${probe.bank_power}A-${probe.bank_no}`, // optional

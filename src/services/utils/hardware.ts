@@ -6,6 +6,7 @@ import { findFirstLoadBankFrame, buildLoadBankFrame } from "./lbProtocol";
 
 import type { InterlockState } from "@/types/generalTypes"; // DB_HOST
 import type { Roundtrip, LoadBankProbe, LoadBankStatus } from "@/types/commTypes";
+import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
 
@@ -39,7 +40,7 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
    console.log("[LB/HW] Probing load bank...");
    const ports = await invoke<string[]>("list_ports");
    console.log("[LB/HW] Available ports:", ports);
-   const baud = 115200;
+   const baud = DEV_ECHO_BAUD;
 
    for (const portName of ports) {
       try {
@@ -48,7 +49,7 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
          // Ask Tauri to just listen (no TX) for a short window.
          const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { 
             data: [], 
-            durationMs: 500 
+            durationMs: DEV_ECHO_DELAY
          });
 
          await invoke("close").catch(() => {});
@@ -127,7 +128,7 @@ export async function setLoadBankContactors(opts: {
 
    const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", {
       data: Array.from(txFrame),
-      durationMs: 200,
+      durationMs: DEV_ECHO_DELAY,
    });
    
    console.debug("[LB/HW] Command sent_bytes:", roundtrip.sent_bytes);
@@ -164,9 +165,9 @@ export async function setLoadBankContactors(opts: {
 }
 
 
-export async function readLoadBankStatusOnce(portName: string, baud = 115200): Promise<LoadBankStatus | null> {
+export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_BAUD): Promise<LoadBankStatus | null> {
    await invoke("connect", { portName, baud });
-   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { data: [], durationMs: 300 });
+   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { data: [], durationMs: DEV_ECHO_DELAY });
    await invoke("close").catch(() => {});
 
    const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
