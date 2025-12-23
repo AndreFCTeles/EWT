@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import { CRC8_TABLE, LoadBankFrame, LoadBankStatus, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { CRC8_TABLE, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
+import type { LoadBankFrame, LoadBankStatus, LoadBankHealth } from "@/types/commTypes";
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 
@@ -7,16 +9,9 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 
 
-
-
-
-
-
-
-
-   // mirror CRC_Calculator(message++, 13):
-   // - "size" = 13  => loop i = 1..12 inclusive
-   // - frame[0] is start; frame[14] is CRC; frame[15] is stop
+// mirror CRC_Calculator(message++, 13):
+// - "size" = 13  => loop i = 1..12 inclusive
+// - frame[0] is start; frame[14] is CRC; frame[15] is stop
 function crc8LoadBank(frame: Uint8Array): number {
    if (frame.length < 13) throw new Error("frame too short for CRC");
    let crc = 0;
@@ -27,7 +22,7 @@ function crc8LoadBank(frame: Uint8Array): number {
 }
 
 // encode/decode helpers based on "(0x0000-0xFFFF) + 0x02" rule in the sheet.
-// You may tweak these once you've confirmed behaviour with the real HW.
+// You may tweak these once you've confirmed behavior with the real HW.
 function encodeU8(raw: number): number {
    if (raw < 0 || raw > 0xfd) throw new Error("raw U8 out of allowed range (0x00–0xFD)");
    return (raw + 0x02) & 0xff;
@@ -141,48 +136,168 @@ export function findFirstLoadBankFrame(raw: number[] | Uint8Array): {
 }
 
 
+/* ---------- runtime polling manager (optimized) ---------- */
+
+type StatusCb = (s: LoadBankStatus) => void;
+type HealthCb = (h: LoadBankHealth) => void;
+
+type SessionKey = string; // `${portName}:${baud}`
+
+type Session = {
+   portName: string;
+   baud: number;
+   statusCbs: Set<StatusCb>;
+   healthCbs: Set<HealthCb>;
+   unlistenStatus?: UnlistenFn;
+   unlistenHealth?: UnlistenFn;
+   stopping?: Promise<void>;
+};
+
+const sessions = new Map<SessionKey, Session>();
+const lastStatusByPort = new Map<string, LoadBankStatus>();
+
+function keyOf(portName: string, baud: number): SessionKey {
+   return `${portName}:${baud}`;
+}
+
+export function getLastLoadBankStatus(portName: string): LoadBankStatus | undefined {
+   return lastStatusByPort.get(portName);
+}
+
 export async function startLoadBankPolling(
    portName: string,
    onStatus: (s: LoadBankStatus) => void,
    abortSignal: AbortSignal,
    baud = DEV_ECHO_BAUD
-) {
-   console.log("[LB] startLoadBankPolling", { portName, baud });
-   await invoke("connect", { portName, baud });
+): Promise<() => Promise<void>> {
+   const key = keyOf(portName, baud);
+   let session = sessions.get(key);
 
-   const loop = async () => {
-      while (!abortSignal.aborted) {
-         try {
-            const roundtrip = await invoke<{
-               recv_bytes: number[];
-               sent_bytes: number[];
-            }>("test_roundtrip_bytes", {
-               data: [],          // just listen
-               durationMs: DEV_ECHO_DELAY,
-            });
+   if (!session) {
+      session = {
+         portName,
+         baud,
+         statusCbs: new Set(),
+         healthCbs: new Set(),
+      };
+      sessions.set(key, session);
 
-            if (roundtrip.recv_bytes.length) {
-               console.debug( "[LB] poll recv_bytes", roundtrip.recv_bytes );
-            }
-            const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
-            if (match) {
-               onStatus({
-                  ...match.parsed,
-                  portName,
-               });
-            }
-         } catch (e) {
-            console.error("Power bank poll error", e);
-            // Optionally mark as offline here
-            await invoke("close").catch(() => {});
-         }
-         //await new Promise(r => setTimeout(r, 300));
+      // start runtime once
+      await invoke("lb_start_polling", { portName, baud });
+
+      // single event listeners per session
+      session.unlistenStatus = await listen<LoadBankStatus>("lb/status", (e) => {
+         const s = e.payload;
+         if (s.portName !== portName) return;
+         lastStatusByPort.set(portName, s);
+         for (const cb of session!.statusCbs) cb(s);
+      });
+
+      session.unlistenHealth = await listen<LoadBankHealth>("lb/health", (e) => {
+         const h = e.payload;
+         if (h.portName !== portName) return;
+         for (const cb of session!.healthCbs) cb(h);
+      });
+   }
+   // register this subscriber
+   session.statusCbs.add(onStatus);
+
+   // stop function only removes THIS subscriber; runtime stops when nobody is listening
+   const stop = async () => {
+      const s = sessions.get(key);
+      if (!s) return;
+
+      s.statusCbs.delete(onStatus);
+
+      // if still has listeners, keep runtime alive
+      if (s.statusCbs.size > 0 || s.healthCbs.size > 0) return;
+
+      // stop once
+      if (!s.stopping) {
+         s.stopping = (async () => {
+         s.unlistenStatus?.();
+         s.unlistenHealth?.();
+         await invoke("lb_stop_polling").catch(() => {});
+         sessions.delete(key);
+         })();
       }
-      console.log("[LB] polling loop stopped (abortSignal)");
+      await s.stopping;
    };
 
-   loop().catch((err) => { console.error("[LB] polling loop crashed", err); });
+   if (abortSignal.aborted) {
+      await stop();
+      return stop;
+   }
+   abortSignal.addEventListener("abort", () => { void stop(); }, { once: true });
+
+   return stop;
 }
+
+export async function lbWriteBytes(frame: Uint8Array) {
+   await invoke("lb_write_bytes", { data: Array.from(frame) });
+}
+
+
+
+
+export async function waitForLoadBankMask(
+   portName: string,
+   expectedMask: number,
+   cfg: { timeoutMs?: number } = {}
+): Promise<LoadBankStatus> {
+   const timeoutMs = cfg.timeoutMs ?? 2000;
+
+   return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const keyCandidates = [...sessions.values()].filter(s => s.portName === portName);
+      if (keyCandidates.length === 0) {
+         reject(new Error(`[LB] waitForLoadBankMask called but no active polling session for ${portName}`));
+         return;
+      }
+
+      let done = false;
+      const tick = (s: LoadBankStatus) => {
+         if (done) return;
+         if (s.portName !== portName) return;
+         if ((s.contactorsMask ?? 0) === expectedMask) {
+            done = true;
+            cleanup();
+            resolve(s);
+         } else if (Date.now() - start > timeoutMs) {
+            done = true;
+            cleanup();
+            reject(new Error(`[LB] timeout waiting for mask 0x${expectedMask.toString(16)} (last=0x${(s.contactorsMask ?? 0).toString(16)})`));
+         }
+      };
+
+      // attach a temporary subscriber to ALL sessions for this port (usually 1)
+      const unsubscribers: Array<() => void> = [];
+      for (const sess of sessions.values()) {
+         if (sess.portName !== portName) continue;
+         sess.statusCbs.add(tick);
+         unsubscribers.push(() => sess.statusCbs.delete(tick));
+      }
+
+      const timer = window.setTimeout(() => {
+         if (done) return;
+         done = true;
+         cleanup();
+         reject(new Error(`[LB] timeout waiting for mask 0x${expectedMask.toString(16)}`));
+      }, timeoutMs);
+
+      const cleanup = () => {
+         clearTimeout(timer);
+         for (const u of unsubscribers) u();
+      };
+
+      // immediate check with last known state
+      const last = getLastLoadBankStatus(portName);
+      if (last) tick(last);
+   });
+}
+
+
+
 
 
 

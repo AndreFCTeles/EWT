@@ -1,17 +1,18 @@
 import { Unit, Dut } from "./checklistTypes";
 import { ProductData } from "./productTypes";
 
-// Connection Params
 
 
 
 
-
-// ------ CRC ------
+/* ──────────────────────────────────────────────────────────────────────────────
+   Load bank protocol constants
+────────────────────────────────────────────────────────────────────────────── */
 export const LB_FRAME_LEN = 16;
 export const LB_START = 0x01;
 export const LB_STOP = 0x00;
 
+// ------ CRC ------
 export const CRC8_TABLE: number[] = [
    0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65,
    157, 195, 33, 127, 252, 162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220,
@@ -33,6 +34,9 @@ export const CRC8_TABLE: number[] = [
 
 
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   Load bank frames/status
+────────────────────────────────────────────────────────────────────────────── */
 // ------ CONNECTION ------
 export type LoadBankFrame = {
    version: number;        // decoded
@@ -130,6 +134,13 @@ export type LoadBankProbe =
          bank_power: number;
          bank_no: number;
       };
+      
+export type LoadBankHealth = {
+   portName: string;
+   online: boolean;
+   lastSeenMs: number;
+   reason?: string | null;
+};
 
 
 
@@ -137,11 +148,13 @@ export type LoadBankProbe =
 
 
 
-// ------ MULTIMETER ------
+/* ──────────────────────────────────────────────────────────────────────────────
+   Multimeter 
+────────────────────────────────────────────────────────────────────────────── */
 export interface MultimeterPoint { 
    key:string; 
    value:number; 
-   unit:Unit; //|string 
+   unit:Unit; // | string;
    ts?:string 
 }
 export interface MultimeterReading { 
@@ -165,7 +178,9 @@ export interface MultimeterReading {
 
 
 
-// ------ API ------
+/* ──────────────────────────────────────────────────────────────────────────────
+   API
+────────────────────────────────────────────────────────────────────────────── */
 export type ApiOk<T>={ 
    ok:true; 
    data:T 
@@ -182,7 +197,9 @@ export type ApiResponse<T>=ApiOk<T>|ApiErr;
 
 
 
-// ------ DUT ------
+/* ──────────────────────────────────────────────────────────────────────────────
+   DuT profile 
+────────────────────────────────────────────────────────────────────────────── */
 export type DutProfileOrigin = 'profile' | 'product';    // | string;
 
 export type DutProfileKey = string;                      // e.g. brand::prodName::series::catPath
@@ -225,7 +242,9 @@ export type DutProfile = {
 
 
 
-// ------ CALIBRATION ------
+/* ──────────────────────────────────────────────────────────────────────────────
+   CALIBRATION/SETPOINTS
+────────────────────────────────────────────────────────────────────────────── */
 export type CalibrationSetpoint = {
    id: number;                // 1..4
    currentA: number;          // target current
@@ -234,7 +253,8 @@ export type CalibrationSetpoint = {
 
 export type ContactorOption = {
    mask: number;              // 16-bit mask, C1..C16
-   label: string;             // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
+   comboLabel: string;
+   errorLabel: string;        // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
    errorPercent: number;      // |I_actual - I_target| / I_target * 100
 };
 
@@ -242,29 +262,85 @@ export type SetpointConfig = CalibrationSetpoint & {
    options: ContactorOption[];
 };
 
+
+export type TunnelIndex = 0 | 1 | 2 | 3;
+
 export type LoadBankBranch = {
    id: "R1" | "R2" | "R3" | "R4" | "R5" | "R6" | "R7" | "R8";
    ohm: number;
-   maxKw: number;
    maskBit: number;           // which bit in contactorsMask corresponds to this branch
+   tunnel: TunnelIndex;
+   //maxKw: number;
 };
 
 export const LB_BRANCHES: LoadBankBranch[] = [
-   { id: "R1", ohm: 4.28, maxKw: 4.0, maskBit: 1 << 0 },
-   { id: "R2", ohm: 2.0,  maxKw: 4.0, maskBit: 1 << 1 },
-   { id: "R3", ohm: 1.0,  maxKw: 4.0, maskBit: 1 << 2 },
-   { id: "R4", ohm: 0.5,  maxKw: 4.0, maskBit: 1 << 3 },
-   { id: "R5", ohm: 0.36, maxKw: 4.0, maskBit: 1 << 4 },
-   { id: "R6", ohm: 0.36, maxKw: 4.0, maskBit: 1 << 5 },
-   { id: "R7", ohm: 0.23, maxKw: 4.0, maskBit: 1 << 6 },
-   { id: "R8", ohm: 0.23, maxKw: 4.0, maskBit: 1 << 7 },
+   { id: "R1", ohm: 4.28, maskBit: 1 << 0, tunnel: 0 }, // maxKw: 4.0,
+   { id: "R2", ohm: 2.0, maskBit: 1 << 1, tunnel: 0 }, // maxKw: 4.0,
+
+   { id: "R3", ohm: 1.0, maskBit: 1 << 2, tunnel: 1 }, // maxKw: 4.0,
+   { id: "R4", ohm: 0.5, maskBit: 1 << 3, tunnel: 1 }, // maxKw: 4.0,
+
+   { id: "R5", ohm: 0.36, maskBit: 1 << 4, tunnel: 2 }, // maxKw: 4.0,
+   { id: "R6", ohm: 0.36, maskBit: 1 << 5, tunnel: 2 }, // maxKw: 4.0,
+
+   { id: "R7", ohm: 0.23, maskBit: 1 << 6, tunnel: 3 }, // maxKw: 4.0,
+   { id: "R8", ohm: 0.23, maskBit: 1 << 7, tunnel: 3 }, // maxKw: 4.0,
 ];
 
 export type ComboCandidate = {
-   mask: number;                 // contactors mask for this combo
-   branches: LoadBankBranch[];   // which resistors are on
-   reqOhm: number;               // equivalent resistance
-   approxCurrentA: number;       // current delivered at U2
-   relErrCurrent: number;        // |I_actual - I_target| / I_target
-   relErrAbs: number;            // signed: + means I_actual > I_target, - means I_actual < I_target
+   mask: number;
+   branches: LoadBankBranch[];
+   reqOhm: number;
+
+   u2V: number;
+   approxCurrentA: number;
+
+   // signed current error: (I_actual - I_target) / I_target
+   errI: number;
+   absErrI: number;
+
+   // signed resistance error: (R_req - R_target) / R_target (Excel-like)
+   errR: number;
+   absErrR: number;
+
+   // thermal / balance metadata
+   score: number;
+   maxBranchKw: number;
+   maxBranchFactor: number; // max P_branch / P_R
+   maxTunnelKw: number;
+
+   // time-limited: min remaining ON time among branches considering duty-cycle budget
+   // null => impossible (no overload window), Infinity => continuous
+   maxOnMs: number | null;
+
+   // duty-cycle metadata (debug / UI hints)
+   cycleMs: number;
+   usedOnMsMax: number;
+   remainingOnMsMin: number | null;
+
+   // UI warnings (not selection gates)
+   outOfTolerance: boolean;
+};
+
+export type OverloadWindow = {
+   factorMax: number;            // multiple of P_R allowed
+   tOnMaxMs: number;             // max ON time for that factor
+   cycleMs: number;              // reference cycle (120s)
+};
+
+export type ResistorSpec = {
+   P_R: number;                  // e.g. 4000 W
+   surfaceTmaxC: number;         // 450 °C
+   overloadWindows: OverloadWindow[];
+};
+
+export const RDP4000: ResistorSpec = {
+   P_R: 4000,
+   surfaceTmaxC: 450,
+   overloadWindows: [
+      { factorMax: 7.5, tOnMaxMs:  5000, cycleMs: 120000 },
+      { factorMax: 5.0, tOnMaxMs: 10000, cycleMs: 120000 },
+      { factorMax: 2.8, tOnMaxMs: 20000, cycleMs: 120000 },
+      { factorMax: 1.7, tOnMaxMs: 40000, cycleMs: 120000 },
+   ],
 };

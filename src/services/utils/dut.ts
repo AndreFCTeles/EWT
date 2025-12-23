@@ -15,7 +15,7 @@ export const ALLOWED_POWERS: RatedCurrent[] = [300, 400, 500, 600];
 
 function defaultCategory(process: Process): ProdCategory {
    const base = { main: 'maq' };
-   if (process === 'MIG') return { 
+   if (process === 'MIGConv' || process === 'MIGInv') return { 
       ...base, 
       sub: { 
          main: 'maq-mig', 

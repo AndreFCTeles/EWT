@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
-import type { StepRuntimeProps } from '@checklist/pipeline';
+import { invoke } from "@tauri-apps/api/core";
+
 import { probeConnectedLB } from '@utils/hardware';
 import { nowIso } from '@utils/generalUtils';
+
+import type { StepRuntimeProps } from '@checklist/pipeline';
 import type { LoadBankProbe, LoadBankStatus } from '@/types/commTypes';
 import { DEV_ECHO_ENABLED, DEV_ECHO_PORT, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from '@/dev/devConfig'
 
@@ -27,6 +30,9 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
       (async () => {
          console.log("[DetectLoadBank] Starting probe...");
 
+         // Ensure runtime poller is not holding the port while we do debug probing.
+         await invoke("lb_stop_polling").catch(() => {});
+
          let probe: LoadBankProbe;
          try {
             probe = await probeConnectedLB();
@@ -38,8 +44,8 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
 
             complete({
                id,
-               startedAt:nowIso(),
-               endedAt:nowIso(),
+               startedAt: nowIso(),
+               endedAt: nowIso(),
                verdict: "fail",
                notes: [
                   "Erro ao tentar detetar a banca de carga.",
@@ -99,19 +105,17 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
          if (!probe.connected) {
             complete({
                id,
-               startedAt:nowIso(),
-               endedAt:nowIso(),
+               startedAt: nowIso(),
+               endedAt: nowIso(),
                verdict: "warn",
-               notes: [
-                  "Banca de carga não está ligada ou não foi detetada.",
-               ],
+               notes: [ "Banca de carga não está ligada ou não foi detetada." ],
             }, { loadBank: null, });
          } else {
 
             complete({
                id,
-               startedAt:nowIso(),
-               endedAt:nowIso(),
+               startedAt: nowIso(),
+               endedAt: nowIso(),
                verdict: "pass",
                commanded: {
                   // purely informational: "we asked to probe ports"
@@ -125,9 +129,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
          }
       })();
 
-      return () => {
-         cancelled = true;
-      };
+      return () => { cancelled = true; };
    }, [id, isActive, complete, abort, submission]);
 
    // Auto step: no UI, just side-effect.

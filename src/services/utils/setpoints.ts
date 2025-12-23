@@ -1,65 +1,124 @@
 import { DEV_ECHO_COUNT, DEV_ECHO_REL_ERROR } from "@/dev/devConfig";
-import type { Process } from "@/types/checklistTypes";
-import type { LoadBankBranch, ContactorOption, SetpointConfig, ComboCandidate } from "@/types/commTypes";
-import { LB_BRANCHES } from "@/types/commTypes";
+import { LB_BRANCHES, RDP4000 } from "@/types/commTypes";
 import { roundTo5 } from "./generalUtils";
+import type { Process } from "@/types/checklistTypes";
+import type { 
+   LoadBankBranch, 
+   ContactorOption, 
+   SetpointConfig, 
+   ComboCandidate, 
+   ResistorSpec
+} from "@/types/commTypes";
 
 
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   Debug
+────────────────────────────────────────────────────────────────────────────── */
+
+const DEBUG_SETPOINTS = true; // flip to false when stable
+function dbg(...args: any[]) { if (DEBUG_SETPOINTS) console.log(...args); }
 
 
+/* ──────────────────────────────────────────────────────────────────────────────
+   Config
+────────────────────────────────────────────────────────────────────────────── */
+
+// expected “measurement on” time for a setpoint burn (used for overload feasibility)
+const MEAS_PULSE_MS = 5000;
+
+// tunnel cooling: 2 resistors per tunnel + fan; use as a balance target (not a hard limit)
+const TUNNEL_CONT_KW = 8.0;
+
+// Error preference:
+// - Best is around -0.1% (slightly under target).
+// - Treat near-zero as "positive-ish" to avoid choosing 0.0% over a small negative.
+const TARGET_UNDER = -0.001; // -0.1%
+const ZERO_AS_POS = 0.0005; // -0.05% and above counts as positive-ish
+const POS_FINE_MAX = 0.001; // +0.1% is "nice positive"
 
 
-/**
- * Generate N equidistant setpoints between min and max, including both ends.
- */
-/*
-export function generateEquidistantSetpoints(min: number, max: number, count: number): number[] {
-   if (!Number.isFinite(min) || !Number.isFinite(max)) {
-      throw new Error("Setpoints must be finite numbers");
+/* ──────────────────────────────────────────────────────────────────────────────
+   Level 1 duty-cycle budgeting (rolling window)
+────────────────────────────────────────────────────────────────────────────── */
+
+type Interval = { startMs: number; endMs: number };
+
+export class DutyCycleBudget {
+   readonly cycleMs: number;
+   private currentMask = 0;
+   private lastChangeMs = Date.now();
+   private intervalsByBit = new Map<number, Interval[]>();
+   constructor(private spec: ResistorSpec) {
+      const w = spec.overloadWindows?.[0];
+      this.cycleMs = w?.cycleMs ?? 120_000;
    }
-   if (max <= min) {
-      throw new Error("Max setpoint must be greater than min setpoint");
+   /** Call whenever the *actual* contactorsMask changes (from polling or command response). */
+   setMask(nextMask: number, atMs = Date.now()) {
+      if (!Number.isFinite(atMs)) atMs = Date.now();
+      if (nextMask === this.currentMask) return;
+      const prevMask = this.currentMask;
+      const from = this.lastChangeMs;
+      const to = Math.max(atMs, from);
+      // record interval for every branch that was ON
+      for (const b of LB_BRANCHES) {
+         if (prevMask & b.maskBit) {
+            const arr = this.intervalsByBit.get(b.maskBit) ?? [];
+            arr.push({ startMs: from, endMs: to });
+            this.intervalsByBit.set(b.maskBit, arr);
+         }
+      }
+      this.currentMask = nextMask;
+      this.lastChangeMs = to;
+      this.prune(to);
    }
-   if (count < 2) {
-      return [Math.round(min)];
+   /** Rolling used time for a given maskBit within [now-cycleMs, now]. Includes current ON time. */
+   usedOnMs(maskBit: number, nowMs = Date.now()): number {
+      const windowStart = nowMs - this.cycleMs;
+      const arr = this.intervalsByBit.get(maskBit) ?? [];
+      let used = 0;
+      for (const it of arr) {
+         const a = Math.max(it.startMs, windowStart);
+         const b = Math.min(it.endMs, nowMs);
+         if (b > a) used += b - a;
+      }
+      // include current ON segment if this bit is currently on
+      if (this.currentMask & maskBit) {
+         const a = Math.max(this.lastChangeMs, windowStart);
+         const b = nowMs;
+         if (b > a) used += b - a;
+      }
+      return used;
    }
-   const step = (max - min) / (count - 1);
-   const points = Array.from({ length: count }, (_, i) => Math.round(min + i * step));
-   console.log("[LB/SETPOINTS] Equidistant", { min, max, count, points });
-   return points;
+   /** Removes intervals that are completely outside the rolling window. */
+   prune(nowMs = Date.now()) {
+      const windowStart = nowMs - this.cycleMs;
+      for (const [bit, arr] of this.intervalsByBit.entries()) {
+         const kept = arr.filter((it) => it.endMs > windowStart);
+         if (kept.length) this.intervalsByBit.set(bit, kept);
+         else this.intervalsByBit.delete(bit);
+      }
+   }
+   reset() {
+      this.currentMask = 0;
+      this.lastChangeMs = Date.now();
+      this.intervalsByBit.clear();
+   }
 }
-   */
 
-/**
- * Process-specific rules:
- * - MMA / TIG / MIGInv: manual min & max (from dut.ratedCurrent), 2 equidistant internal points.
- * - MIGConv: only max is manual; we use 25%, 50%, 75%, 100% of max.
- */
-/*
-export function generateSetpointsForProcess(
-   process: Process,
-   minCurrent: number | undefined,
-   maxCurrent: number,
-   count?: number
-): number[] {
-   if (!count) count = DEV_ECHO_COUNT;
+/** Singleton budget for this app run. */
+export const lbDutyBudget = new DutyCycleBudget(RDP4000);
 
-   if (process === "MIGConv") {
-      //const percents = [0.25, 0.5, 0.75, 1];
-      const percents = count===5 ? 
-         [0.2, 0.4, 0.6, 0.8, 1] : 
-         [0.25, 0.5, 0.75, 1];
-      const points = percents.map((p) => Math.round(maxCurrent * p));
-      console.log("[LB/SETPOINTS] MIGConv fixed percents", { maxCurrent, points });
-      return points;
-   }
-
-
-   const min = minCurrent ?? Math.round(maxCurrent * 0.25);
-   return generateEquidistantSetpoints(min, maxCurrent, count);
+/** Convenience for wiring from polling/command replies. */
+export function updateDutyCycleFromMask(mask: number, atMs?: number) {
+   lbDutyBudget.setMask(mask, atMs);
 }
-   */
+
+
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Public API: setpoint list
+────────────────────────────────────────────────────────────────────────────── */
 
 export function generateSetpointsForProcess(
    process: Process,
@@ -67,37 +126,26 @@ export function generateSetpointsForProcess(
    maxCurrent: number,
    count = DEV_ECHO_COUNT
 ): number[] {
-   if (!maxCurrent || maxCurrent <= 0 || count <= 0) return [];
-   console.log("---------------------- GENERATING SETPOINTS ----------------------");
-   console.log("maxCurrent:", maxCurrent);
+   if (!Number.isFinite(maxCurrent) || !maxCurrent || maxCurrent <= 0 || count <= 0) return [];
+   dbg("---------------------- GENERATING SETPOINTS ----------------------");
+   dbg("maxCurrent:", maxCurrent);
 
    // MIGConv: ignore min, use 25/50/75/100% of max
-   if (process === "MIGConv") {
-      console.log("Process: ", process)
-      const fractions = [0.25, 0.5, 0.75, 1.0].slice(0, count);
-      console.log("fractions: ", fractions)
-      //const raw = fractions.map((f) => maxCurrent * f);
-      const raw = fractions.map((f) => Math.max(5, maxCurrent * f));
-      console.log("raw: ", raw)
-      const rounded = raw.map(roundTo5);
-      console.log("rounded setpoints: ", rounded)
-      // ensure sorted and unique
-      //return Array.from(new Set(rounded)).sort((a, b) => a - b);
+   if (process === "MIGConv") { /* ------------------------------------------------------ */ dbg("Process: ", process)
+      const fractions = [0.25, 0.5, 0.75, 1.0].slice(0, count); /* ---------------------- */ dbg("fractions: ", fractions);
+      const rounded = fractions.map((f) => roundTo5(Math.max(5, maxCurrent * f))); /* --- */ dbg("rounded setpoints: ", rounded);
+      let uniq = Array.from(new Set(rounded)).sort((a, b) => a - b); /* ----------------- */ dbg("Unique setpoints: ", uniq);
 
-      let uniq = Array.from(new Set(rounded)).sort((a, b) => a - b);
-      console.log("Unique setpoints: ", uniq)
       const roundedMax = roundTo5(maxCurrent);
-      if (!uniq.includes(roundedMax)) { uniq.push(roundedMax); }
+      if (!uniq.includes(roundedMax)) uniq.push(roundedMax);
+      if (uniq.length > count) { uniq = uniq.slice(uniq.length - count); } 
 
-      if (uniq.length > count) { uniq = uniq.slice(uniq.length - count); }
-      console.log("after rounding uniq: ", uniq)
-
+      dbg("[setpoints] generated MIGConv setpoints:", uniq);
       return uniq;
    }
    
-   console.log("Process: ", process)
-   console.log("minCurrent:", minCurrent);
-
+   dbg("Process: ", process)
+   dbg("minCurrent:", minCurrent);
 
    // Default min: 5% of max, at least 5 A
    const fallbackMin = Math.max(5, maxCurrent * 0.05);
@@ -109,43 +157,27 @@ export function generateSetpointsForProcess(
       minCurrent >= 5 &&
       minCurrent < maxCurrent
          ? minCurrent
-         : fallbackMin; 
-   console.log("minForUse:", minForUse);
+         : fallbackMin; /* -------------------------------------------------------------- */ dbg("minForUse:", minForUse);
 
    if (count === 1) { return [roundTo5(maxCurrent)]; }
 
    const step = (maxCurrent - minForUse) / (count - 1);
-   const currents: number[] = [];
-
-   
-   console.log("raw calculated setpoints:");
-   for (let i = 0; i < count; i++) {
-      const raw = minForUse + i * step;
-      console.log(raw);
-      currents.push(roundTo5(raw));
-   }
-   console.log("rounded calculated setpoints:", currents);
+   const points = Array.from({ length: count }, (_, i) => roundTo5(minForUse + i * step));   dbg("calculated setpoints:", points);
 
    // Ensure monotonic and within [0, maxCurrent] after rounding
-   let uniq = Array.from(new Set(currents)).sort((a, b) => a - b);
-   console.log("Unique setpoints: ", uniq)
+   let uniq = Array.from(new Set(points)).sort((a, b) => a - b); /* --------------------- */ dbg("Unique setpoints: ", uniq);
 
    // Guarantee the last point is exactly rounded maxCurrent
    const roundedMax = roundTo5(maxCurrent);
    if (!uniq.includes(roundedMax)) {
-      if (uniq.length >= count) {
-         uniq[uniq.length - 1] = roundedMax;
-      } else {
-         uniq.push(roundedMax);
-      }
+      if (uniq.length >= count) uniq[uniq.length - 1] = roundedMax;
+      else uniq.push(roundedMax);
    }
 
    // Limit to desired count (keeping the highest ones if we had duplicates)
-   if (uniq.length > count) {
-      uniq = uniq.slice(uniq.length - count);
-   }
-   console.log("Unique setpoints after normalization/guards: ", uniq)
-   console.log("---------------------- ----------------------");
+   if (uniq.length > count) uniq = uniq.slice(uniq.length - count);
+   dbg("[setpoints] generated setpoints:", { process, minForUse, maxCurrent, count, uniq });
+   dbg("---------------------- ----------------------");
 
    return uniq;
 }
@@ -153,77 +185,20 @@ export function generateSetpointsForProcess(
 
 
 
-/**
- * Given process (MMA/TIG/MIG), bank type, and desired current, return best N options sorted by errorPercent.
- */
-   /*
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Public API: resolve setpoint into a single best combo option
+────────────────────────────────────────────────────────────────────────────── */
+
 export function resolveLoadBankSetpoint(
    id: number,
    process: Process,
-   bankType: 0,//string,//"PRODUCTION" | "LAB" | "1000A", // "LAB" = 0
-   targetCurrent: number,
-   maxRelError = DEV_ECHO_REL_ERROR
-): SetpointConfig {
-
-   console.log("[LB/SETPOINTS] resolveLoadBankSetpoint props: ", { id, process, bankType, targetCurrent });
-   const combo = findBestComboForCurrent(process, targetCurrent, maxRelError);
-
-   const options: ContactorOption[] = combo ? [
-      {
-         mask: combo.mask,
-         label: formatComboLabel(combo),
-         errorPercent: combo.relErrCurrent * 100,
-      },
-   ] : [];
-
-   return {
-      id,
-      currentA: targetCurrent,
-      options,
-   };
-   return {
-      id,
-      currentA: targetCurrent,
-      options: [
-         {
-            mask: 0b0000_0000_0000_1111,
-            label: "",//"Dummy combo R1+R2+R3+R4 (TBD)",
-            errorPercent: 1.2,
-         },
-      ],
-   };
-}
-   */
-export function resolveLoadBankSetpoint(
-   id: number,
-   process: Process,
-   bankType: 0,//string,//"PRODUCTION" | "LAB" | "1000A", // "LAB" = 0
+   bankType: 0, //string, //"PRODUCTION" | "LAB" | "1000A", // "LAB" = 0
    currentA: number,
    maxRelError = 0.15
 ): SetpointConfig {
    const combo = findBestComboForCurrent(process, currentA, maxRelError);
 
-   /*
-   if (!combo) {
-      console.warn(
-         "[setpoints] no valid resistor combo",
-         { id, process, currentA, bankType }
-      );
-   } else {
-      console.debug(
-         "[setpoints] combo chosen",
-         {
-            id,
-            process,
-            currentA,
-            approxCurrentA: combo.approxCurrentA,
-            relErrCurrent: combo.relErrCurrent,
-            branches: combo.branches.map((b) => b.id),
-            mask: `0x${combo.mask.toString(16)}`,
-         }
-      );
-   }
-   */
    if (!combo) {
       console.warn("[setpoints] no valid resistor combo", {
          id,
@@ -235,70 +210,65 @@ export function resolveLoadBankSetpoint(
       return {
          id,
          currentA: currentA,
-         options: [], // "impossível" case – matches your sheet
+         options: [],
       };
    }
 
-   /*
-   const options: ContactorOption[] = combo
-      ? [
-         {
-            mask: combo.mask,
-            label: combo.branches
-               .map((b) => b.id)
-               .sort()
-               .join(" + "),
-            errorPercent: combo.relErrCurrent * 100,
-         },
-      ] : [];
-   */
-   const { branches, mask, approxCurrentA, relErrCurrent } = combo;
+   const comboLabel = combo.branches
+      .map((b) => b.id)
+      .slice()
+      .sort()
+      .join(" + ");
 
-   const R_target = calcU2(process, currentA) / currentA;
-   const relErrPercentR = relErrCurrent * 100;
 
-   // You can change this label format if you prefer something else
-   const label =
-      branches
-         .map((b) => b.id)
-         .sort()
-         .join(" + ") +
-      ` (Req≈${combo.reqOhm.toFixed(4)}Ω, Rerr=${relErrPercentR.toFixed(1)}%)`;
+   // Prefer showing BOTH:
+   // - Rerr% (sheet-consistent, and what we rank on)
+   // - Ierr% (informational, derived)
+   const rErrPct = combo.errR * 100;
+   const iErrPct = combo.errI * 100;
+
+   const maxOn =
+      combo.maxOnMs == null
+         ? "impossível"
+         : combo.maxOnMs === Infinity
+         ? "contínuo"
+         : `${Math.round(combo.maxOnMs / 1000)}s`;
+
+   const errorLabel = [
+      `I≈${combo.approxCurrentA.toFixed(0)}A`,
+      `Ierr=${iErrPct.toFixed(1)}%`,
+      `Req≈${combo.reqOhm.toFixed(4)}Ω`,
+      `Rerr=${rErrPct.toFixed(1)}%`,
+      `tOn=${maxOn}`,
+      `usedMax=${Math.round(combo.usedOnMsMax / 1000)}s/${Math.round(combo.cycleMs / 1000)}s`,
+   ].join(" · ");
 
    const options: ContactorOption[] = [
       {
-         mask,
-         label,
-         // store signed % so you can see "negative" vs "positive" error
-         errorPercent: relErrPercentR,
+         mask: combo.mask,//mask,
+         comboLabel,
+         errorLabel,
+         errorPercent: rErrPct,//relErrPercentR,
       },
    ];
-   
-   /*
-   console.log("resolveLoadBankSetPoint results");
-   console.log({
-      id,
-      currentA: currentA,
-      options,
-   });
-   return {
-      id,
-      currentA: currentA,
-      options,
-   };
-   */
-   
-   console.debug("[setpoints] combo chosen", {
+
+
+   dbg("[setpoints] chosen combo:", {
       id,
       process,
       currentA,
-      approxCurrentA,
-      R_target,
-      R_req: combo.reqOhm,
-      relErrPercentR,
-      branches: branches.map((b) => b.id),
-      maskHex: "0x" + mask.toString(16),
+      u2V: combo.u2V,
+      approxCurrentA: combo.approxCurrentA,
+      errR: combo.errR,
+      errI: combo.errI,
+      branches: combo.branches.map((b) => b.id),
+      maskHex: "0x" + combo.mask.toString(16),
+      maxOnMs: combo.maxOnMs,
+      maxBranchFactor: combo.maxBranchFactor,
+      maxTunnelKw: combo.maxTunnelKw,
+      outOfTolerance: combo.outOfTolerance,
    });
+
 
    return {
       id,
@@ -309,255 +279,451 @@ export function resolveLoadBankSetpoint(
 
 
 
-
-/*
-function calcU2(process: Process, currentA: number): number {
-   if (currentA <= 0) return NaN;
-
-   switch (process) {
-      case "MMA":
-         return 0.04 * currentA + 20;
-      case "TIG":
-         return 0.04 * currentA + 10;
-      case "MIGConv":
-      case "MIGInv":
-         return 0.05 * currentA + 14;
-      default:
-         return NaN;
-   }
-}
-*/
+/* ──────────────────────────────────────────────────────────────────────────────
+   IEC U2 models
+────────────────────────────────────────────────────────────────────────────── */
 
 function calcU2(process: Process, I2: number): number {
-   
-   console.log("calculating U2 for I2: ", I2)
    const I = Math.max(5, I2);
-   console.log("normalized I2: ", I)
-
-   // normV: minProcessV ≤ U2 ≤ maxProcessV
-   // normA: minProcessA ≤ I2 ≤ minProcessA
-
-   let u2: number;
    switch (process) {
-      case "MMA":{
-         u2 = 0.04 * I + 20;
-         if (u2 < 20) u2 = 20;
-         if (u2 > 44) u2 = 44;
-         break;
+      case "MMA": {
+         const u = 0.04 * I + 20;
+         return clamp(u, 20, 44);
       }
-      case "TIG":{
-         u2 = 0.04 * I + 10;
-         if (u2 < 10) u2 = 10;
-         if (u2 > 34) u2 = 34;
-         break;
+      case "TIG": {
+         const u = 0.04 * I + 10;
+         return clamp(u, 10, 34);
       }
       case "MIGConv":
       case "MIGInv": {
-         // MIG type behaviour per IEC, both conv / inv
-         u2 = 0.05 * I + 14;
-         if (u2 < 14) u2 = 14;
-         if (u2 > 44) u2 = 44;
-         break;
+         const u = 0.05 * I + 14;
+         return clamp(u, 14, 44);
       }
-      default:{
-         // Fallback to MMA if ever needed
-         u2 = 0.04 * I + 20;
-         if (u2 < 20) u2 = 20;
-         if (u2 > 44) u2 = 44;
-         break;
+      default: {
+         const u = 0.04 * I + 20;
+         return clamp(u, 20, 44);
       }
    }
-   
-   console.log("calcU2 result: ", u2)
-   return u2;
+}
+
+function clamp(x: number, lo: number, hi: number) {
+   return Math.min(hi, Math.max(lo, x));
 }
 
 
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Thermal feasibility helpers
+────────────────────────────────────────────────────────────────────────────── */
+
+function maxAllowedOnMsForBranch(pKw: number, spec: ResistorSpec): number | null {
+   const factor = (pKw * 1000) / spec.P_R;
+   if (factor <= 1) return Infinity;
+
+   let best = -1;
+   for (const w of spec.overloadWindows) {
+      if (factor <= w.factorMax) best = Math.max(best, w.tOnMaxMs);
+   }
+   return best >= 0 ? best : null;
+}
+
+function isComboFeasibleForPulse(
+   branches: LoadBankBranch[],
+   u2V: number,
+   spec: ResistorSpec,
+   //tOnMs: number
+   pulseMs: number,
+   budget: DutyCycleBudget,
+   nowMs: number
+): { 
+   ok: boolean; 
+   maxOnMs: number | null; 
+   maxBranchKw: number; 
+   maxBranchFactor: number; 
+   maxTunnelKw: number;
+   usedOnMsMax: number;
+   remainingOnMsMin: number | null;
+} {
+   let maxOnMs: number | null = Infinity;
+   let usedOnMsMax = 0;
+   let remainingOnMsMin: number | null = Infinity;
+
+   let maxBranchKw = 0;
+   let maxBranchFactor = 0;
+   const tunnelKw: number[] = [0, 0, 0, 0];
+
+   for (const b of branches) {
+      const pKw = (u2V * u2V) / b.ohm / 1000;
+      maxBranchKw = Math.max(maxBranchKw, pKw);
+
+      const factor = (pKw * 1000) / spec.P_R;
+      maxBranchFactor = Math.max(maxBranchFactor, factor);
+
+      tunnelKw[b.tunnel] += pKw;
+
+      const allowed = maxAllowedOnMsForBranch(pKw, spec);
+      if (allowed == null) {
+         return {
+            ok: false,
+            maxOnMs: null,
+            maxBranchKw,
+            maxBranchFactor,
+            maxTunnelKw: Math.max(...tunnelKw),
+            usedOnMsMax,
+            remainingOnMsMin: null,
+         };
+      }
+
+      const used = budget.usedOnMs(b.maskBit, nowMs);
+      usedOnMsMax = Math.max(usedOnMsMax, used);
+
+      // budget remaining in the rolling cycle window
+      const remaining =
+         allowed === Infinity ? Infinity : Math.max(0, allowed - used);
+
+      // for UI/debug: min remaining across branches
+      if (remainingOnMsMin === Infinity) remainingOnMsMin = remaining;
+      else if (remainingOnMsMin != null) remainingOnMsMin = Math.min(remainingOnMsMin, remaining);
+
+      // “maxOnMs” for the combo becomes the minimum remaining among branches
+      if (maxOnMs === Infinity) maxOnMs = remaining;
+      else if (maxOnMs != null) maxOnMs = Math.min(maxOnMs, remaining);
+   }
+
+
+   const maxTunnelKw = Math.max(...tunnelKw);
+
+   // Hard gate: must be able to run the planned pulse within remaining budget
+   if (maxOnMs !== Infinity && (maxOnMs == null || pulseMs > maxOnMs)) {
+      return {
+         ok: false,
+         maxOnMs,
+         maxBranchKw,
+         maxBranchFactor,
+         maxTunnelKw,
+         usedOnMsMax,
+         remainingOnMsMin: remainingOnMsMin ?? null,
+      };
+   }
+
+   return {
+      ok: true,
+      maxOnMs,
+      maxBranchKw,
+      maxBranchFactor,
+      maxTunnelKw,
+      usedOnMsMax,
+      remainingOnMsMin: remainingOnMsMin ?? null,
+   };
+}
+
+
+function scoreCombo(
+   /*
+   used: LoadBankBranch[],
+   U2: number,
+   relErrAbs: number
+   */
+   branches: LoadBankBranch[],
+   absErrR: number,
+   maxBranchFactor: number,
+   maxTunnelKw: number
+): number { 
+
+   // Tunable weights — start conservative.
+   const wE = 1.0;   //wR = 1.0; // weight of resistance error // main weight is error, but only used after preference comparator tie
+   const wP = 0.5;   // penalty for branch overload // overload penalty above continuous
+   const wT = 0.2;   // penalty for unbalanced tunnel power // tunnel imbalance penalty
+   const wB = 0.05;  // penalty for having many branches // branch count penalty
+
+   const overloadPenalty = Math.max(0, maxBranchFactor - 1); // ≥0 when over continuous
+   const tunnelPenalty = maxTunnelKw / TUNNEL_CONT_KW;       // 1 ≈ 8 kW
+   const branchPenalty = branches.length; //const branchPenalty = used.length; // prefer fewer branches    
+
+   return wE * absErrR + wP * overloadPenalty + wT * tunnelPenalty + wB * branchPenalty;
+}
+
+
+
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Error preference comparator
+────────────────────────────────────────────────────────────────────────────── */
+
+function bucketErrR(errR: number): 0 | 1 | 2 {
+   // 0: true negatives (preferred) — but exclude "near-zero negatives" which we treat as positive-ish
+   // 1: near-zero / small positive (includes -0.05%..0 and 0..+0.1%)
+   // 2: other positive
+   if (errR < -ZERO_AS_POS) return 0;
+   if (errR <= POS_FINE_MAX) return 1;
+   return 2;
+}
+
+function prefCostErrR(errR: number): number {
+   const b = bucketErrR(errR);
+   if (b === 0) return Math.abs(errR - TARGET_UNDER); // closest to -0.1%
+   if (b === 1) return Math.abs(errR);                // closest to 0.0%
+   return errR;                                       // smallest positive
+}
+
+function compareCandidates(a: ComboCandidate, b: ComboCandidate): number {
+   // 1) Prefer within tolerance if available (soft rule, not a filter)
+   if (!!a.outOfTolerance !== !!b.outOfTolerance) return a.outOfTolerance ? 1 : -1;
+
+   // 2) Bucket + preference based on errR
+   const ba = bucketErrR(a.errR);
+   const bb = bucketErrR(b.errR);
+   if (ba !== bb) return ba - bb;
+
+   const pa = prefCostErrR(a.errR);
+   const pb = prefCostErrR(b.errR);
+   if (Math.abs(pa - pb) > 1e-12) return pa - pb;
+
+   // 3) Thermal/balance/branch penalties
+   if (Math.abs(a.score - b.score) > 1e-12) return a.score - b.score;
+
+   // 4) Tie-breaks
+   if (a.branches.length !== b.branches.length) return a.branches.length - b.branches.length;
+   return a.absErrR - b.absErrR;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   Core solver
+────────────────────────────────────────────────────────────────────────────── */
 
 
 function findBestComboForCurrent(
    process: Process,
    targetCurrentA: number,
-   maxRelError = DEV_ECHO_REL_ERROR // 6% to start
+   maxRelError = DEV_ECHO_REL_ERROR
 ): ComboCandidate | null {
-   if (!targetCurrentA || targetCurrentA <= 0) return null;
+   if (
+      !Number.isFinite(targetCurrentA) ||
+      !targetCurrentA ||
+      targetCurrentA <= 0
+   ) return null;
 
-   const U2 = calcU2(process, targetCurrentA);
-   if (!Number.isFinite(U2) || U2 <= 0) return null;
+   const nowMs = Date.now();
+   lbDutyBudget.prune(nowMs);
 
-   const R_target = U2 / targetCurrentA;
+   const u2V = calcU2(process, targetCurrentA);
+   if (!Number.isFinite(u2V) || u2V <= 0) return null;
+
+   const rTarget = u2V / targetCurrentA;
    const n = LB_BRANCHES.length;
+
    const candidates: ComboCandidate[] = [];
 
    for (let maskIndex = 1; maskIndex < (1 << n); maskIndex++) {
-      const used: LoadBankBranch[] = [];
+      const branches: LoadBankBranch[] = [];
       let invSum = 0;
 
       for (let i = 0; i < n; i++) {
          if (maskIndex & (1 << i)) {
             const b = LB_BRANCHES[i];
-            used.push(b);
+            branches.push(b);
             invSum += 1 / b.ohm;
          }
       }
 
-      if (!used.length || invSum === 0) continue;
+      if (!branches.length || invSum === 0) continue;
 
-      const R_req = 1 / invSum;
-      
-      const relErrCurrent = (R_req - R_target) / R_target;
-      const relErrAbs = Math.abs(relErrCurrent);
-      if (relErrCurrent < -maxRelError || relErrCurrent > maxRelError) continue;
-      if (relErrCurrent > 0) continue;
+      const reqOhm = 1 / invSum;
+      const approxCurrentA = u2V / reqOhm;
 
-      /*
-      const approxCurrentA = U2 / reqOhm;
-      const relErrCurrent = (approxCurrentA - targetCurrentA) / targetCurrentA;
-      const relErrAbs = Math.abs(relErrCurrent);
+      // Sheet-consistent error (this is what we rank on)
+      const errR = (reqOhm - rTarget) / rTarget;
+      const absErrR = Math.abs(errR);
 
-      if (relErrAbs > maxRelError) continue;
-      */
+      // Informational error (for labels/warnings only)
+      const errI = (approxCurrentA - targetCurrentA) / targetCurrentA;
+      const absErrI = Math.abs(errI);
 
-      // Per-branch power check (kW)
-      let unsafe = false;
-      for (const b of used) {
-         const pKw = (U2 * U2) / b.ohm / 1000;
-         if (pKw > b.maxKw + 1e-9) {
-            unsafe = true;
-            break;
-         }
-      }
-      if (unsafe) continue;
+      // Thermal feasibility for the expected measurement pulse
+      const feas = isComboFeasibleForPulse(
+         branches,
+         u2V,
+         RDP4000,
+         MEAS_PULSE_MS,
+         lbDutyBudget,
+         nowMs
+      );
+      if (!feas.ok) continue;
 
-      
+      const score = scoreCombo(branches, absErrR, feas.maxBranchFactor, feas.maxTunnelKw);
 
-      const approxCurrentA = U2 / R_req;
       let mask = 0;
-      for (const b of used) mask |= b.maskBit;
+      for (const b of branches) mask |= b.maskBit;
 
       candidates.push({
          mask,
-         branches: used,
-         reqOhm: R_req,
+         branches,
+         reqOhm,
+
+         u2V,
          approxCurrentA,
-         relErrCurrent,
-         relErrAbs,
+
+         errI,
+         absErrI,
+
+         errR,
+         absErrR,
+
+         score,
+         maxBranchKw: feas.maxBranchKw,
+         maxBranchFactor: feas.maxBranchFactor,
+         maxTunnelKw: feas.maxTunnelKw,
+
+         maxOnMs: feas.maxOnMs,
+
+         cycleMs: lbDutyBudget.cycleMs,
+         usedOnMsMax: feas.usedOnMsMax,
+         remainingOnMsMin: feas.remainingOnMsMin,
+
+         // warning only (don’t filter)
+         outOfTolerance: absErrR > maxRelError,
       });
    }
-   console.log("candidates:");
-   console.log(candidates);
 
-   if (!candidates.length) return null;
+   dbg("[setpoints] solver input:", { 
+      process, 
+      targetCurrentA, 
+      u2V, 
+      rTarget, 
+      maxRelError,
+      cycleMs: lbDutyBudget.cycleMs, 
+   });
 
-   // Prefer combos where I_actual >= I_target (relErrCurrent >= 0),
-   // i.e. R_req <= R_target, exactly what you described.
-   /*
-   const preferred = candidates.filter((c) => c.relErrCurrent >= 0);
-
-   const pool = preferred.length > 0 ? preferred : [];
-
-   if (!pool.length) {
-      // No combo that gives at least target current within tolerance
-      return null; // "impossível"
-   }*/
-
-   // Pick smallest absolute error, tie-break by fewer branches
-   let best: ComboCandidate | null = null;
-   for (const c of candidates) {
-      if (
-         !best ||
-         c.relErrAbs < best.relErrAbs ||
-         (Math.abs(c.relErrAbs - best.relErrAbs) < 1e-9 &&
-         c.branches.length < best.branches.length)
-      ) { best = c; }
-   }   
-
-
-
-   console.log("best:");
-   console.log(best);
-   return best;
-}
-
-
-
-/*
-function findBestComboForCurrent(
-   process: Process,
-   targetCurrentA: number,
-   maxRelError = 0.06  // 6% tolerance to start with
-): ComboCandidate | null {
-   if (targetCurrentA <= 0) return null;
-
-   const U2 = calcU2(process, targetCurrentA);
-   if (!Number.isFinite(U2) || U2 <= 0) return null;
-
-   const n = LB_BRANCHES.length;
-   let best: ComboCandidate | null = null;
-
-   // iterate masks 1..(2^n - 1)
-   for (let maskIndex = 1; maskIndex < (1 << n); maskIndex++) {
-      const used: LoadBankBranch[] = [];
-      let invSum = 0; // sum of 1/R
-
-      for (let i = 0; i < n; i++) {
-         if (maskIndex & (1 << i)) {
-            const b = LB_BRANCHES[i];
-            used.push(b);
-            invSum += 1 / b.ohm;
-         }
-      }
-
-      if (invSum === 0) continue;
-      const reqOhm = 1 / invSum;
-
-      // current delivered for this combo at U2
-      const approxCurrentA = U2 / reqOhm;
-      const relErrCurrent = (approxCurrentA - targetCurrentA) / targetCurrentA;
-      const relErrorCurrent = Math.abs(relErrCurrent);
-      //const relErrorCurrent = Math.abs(approxCurrentA - targetCurrentA) / targetCurrentA;
-
-      if (relErrorCurrent > maxRelError) continue; // too far from target
-
-      // thermal check: each branch must be ≤ maxKw
-      let unsafe = false;
-      for (const b of used) {
-         // P = U^2 / R (W) -> /1000 to kW
-         const pKw = (U2 * U2) / b.ohm / 1000;
-         if (pKw > b.maxKw + 1e-9) {
-            unsafe = true;
-            break;
-         }
-      }
-      if (unsafe) continue;
-
-      // Build contactor mask (OR the maskBits of used branches)
-      let mask = 0;
-      for (const b of used) { mask |= b.maskBit; }
-
-      // Select best: smallest error, then fewer branches
-      if (
-         !best ||
-         relErrorCurrent < best.relErrCurrent ||
-         (Math.abs(relErrorCurrent - best.relErrCurrent) < 1e-9 && used.length < best.branches.length)
-      ) {
-         best = {
-            mask,
-            branches: used,
-            reqOhm,
-            approxCurrentA,
-            relErrCurrent,
-         };
-      }
+   if (!candidates.length) {
+      dbg("[setpoints] no feasible candidates");
+      return null;
    }
-   console.log(best);
 
-   return best;
+   candidates.sort(compareCandidates);
+
+   // Helpful peek at the top few
+   const top = candidates.slice(0, 5).map((c) => ({
+      mask: "0x" + c.mask.toString(16),
+      branches: c.branches.map((b) => b.id).join("+"),
+      RerrPct: (c.errR * 100).toFixed(3),
+      IerrPct: (c.errI * 100).toFixed(3),
+      maxOnMs: c.maxOnMs,
+      score: c.score.toFixed(6),
+      outOfTol: !!c.outOfTolerance,
+   }));
+   dbg("[setpoints] top candidates:", top);
+
+   return candidates[0];
 }
 
-function formatComboLabel(combo: ComboCandidate): string {
-   const ids = combo.branches.map((b) => b.id).sort();
-   const approx = combo.approxCurrentA.toFixed(0);
-   return `${ids.join(" + ")} (≈${approx} A)`;
+
+
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Optional: UI helpers (warnings/labels)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export type SetpointWarning = {
+   kind: "warn" | "info";
+   code:
+      | "OUT_OF_TOL"
+      | "POSITIVE_ERROR"
+      | "LARGE_NEGATIVE"
+      | "TIME_LIMITED"
+      | "TUNNEL_IMBALANCE"
+      | "OVER_CONTINUOUS";
+   message: string;
+};
+
+export function getSetpointWarnings(
+   c: ComboCandidate,
+   cfg?: {
+      // warn if |Rerr| above this (sheet-consistent)
+      tolAbsR?: number; // default DEV_ECHO_REL_ERROR
+      // warn if Rerr is positive above this (undercurrent)
+      posWarnAboveR?: number; // default +0.1%
+      // warn if Rerr is negative below this (overcurrent)
+      negWarnBelowR?: number; // default -6%
+      // warn if tunnel power above this (soft)
+      tunnelKwWarnAbove?: number; // default 8kW
+   }
+): SetpointWarning[] {
+   const tolAbsR = cfg?.tolAbsR ?? DEV_ECHO_REL_ERROR;
+   const posWarnAboveR = cfg?.posWarnAboveR ?? 0.001; // +0.1%
+   const negWarnBelowR = cfg?.negWarnBelowR ?? -0.06; // -6%
+   const tunnelKwWarnAbove = cfg?.tunnelKwWarnAbove ?? 8.0;
+
+   const w: SetpointWarning[] = [];
+
+   if (Math.abs(c.errR) > tolAbsR) {
+      w.push({
+         kind: "warn",
+         code: "OUT_OF_TOL",
+         message: `Erro fora da tolerância (R): ${(c.errR * 100).toFixed(2)}%.`,
+      });
+   }
+
+   if (c.errR > posWarnAboveR) {
+      w.push({
+         kind: "warn",
+         code: "POSITIVE_ERROR",
+         message: `Erro positivo elevado (R): ${(c.errR * 100).toFixed(2)}% (corrente abaixo do alvo).`,
+      });
+   }
+
+   if (c.errR < negWarnBelowR) {
+      w.push({
+         kind: "warn",
+         code: "LARGE_NEGATIVE",
+         message: `Erro negativo elevado (R): ${(c.errR * 100).toFixed(2)}% (corrente acima do alvo).`,
+      });
+   }
+
+   if (c.maxOnMs !== null && c.maxOnMs !== Infinity) {
+      w.push({
+         kind: "warn",
+         code: "TIME_LIMITED",
+         message: `Combinação com limite de tempo ON: ~${Math.round(c.maxOnMs / 1000)}s.`,
+      });
+   }
+
+   if (c.maxTunnelKw > tunnelKwWarnAbove) {
+      w.push({
+         kind: "info",
+         code: "TUNNEL_IMBALANCE",
+         message: `Carga alta por túnel: ~${c.maxTunnelKw.toFixed(1)} kW.`,
+      });
+   }
+
+   if (c.maxBranchFactor > 1) {
+      w.push({
+         kind: "info",
+         code: "OVER_CONTINUOUS",
+         message: `Acima da potência contínua em pelo menos um resistor (factor ~${c.maxBranchFactor.toFixed(2)}x).`,
+      });
+   }
+
+   return w;
 }
-*/
+
+export function formatComboSummary(c: ComboCandidate): string {
+   const comboLabel = c.branches
+      .map((b) => b.id)
+      .slice()
+      .sort()
+      .join(" + ");
+
+   const rErrPct = c.errR * 100;
+   const iErrPct = c.errI * 100;
+
+   const maxOn =
+      c.maxOnMs == null
+         ? "impossível"
+         : c.maxOnMs === Infinity
+         ? "contínuo"
+         : `${Math.round(c.maxOnMs / 1000)}s`;
+
+   return `${comboLabel} · I≈${c.approxCurrentA.toFixed(0)}A · Ierr=${iErrPct.toFixed(
+      2
+   )}% · Req≈${c.reqOhm.toFixed(4)}Ω · Rerr=${rErrPct.toFixed(2)}% · tOn=${maxOn}`;
+}
