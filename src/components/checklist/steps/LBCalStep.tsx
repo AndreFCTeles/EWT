@@ -1,11 +1,15 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Button, Group, NumberInput, Stack, Text, Badge } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
 
-import { generateSetpointsForProcess, resolveLoadBankSetpoint, updateDutyCycleFromMask } from "@utils/setpoints";
+import { 
+   generateSetpointsForProcess, 
+   resolveLoadBankSetpoint, 
+   updateDutyCycleFromMask 
+} from "@utils/setpoints";
 import { setLoadBankContactors } from "@utils/hardware";
 import { startLoadBankPolling } from "@utils/lbProtocol";
 import { nowIso } from "@utils/generalUtils";
@@ -16,7 +20,10 @@ import { DEV_ECHO_COUNT } from "@/dev/devConfig";
 
 
 
-
+const DEBUG_LBCAL = true;
+function dbg(...args: any[]) {
+   if (DEBUG_LBCAL) console.log("[LBCalStep]", ...args);
+}
 
 
 export const LBCalStep: React.FC<StepRuntimeProps> = ( {
@@ -30,6 +37,9 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
 } ) => {
    if (!isActive) return null;
 
+   // ────────────────────────────────────────────────────────────────────────────
+   // Inputs
+   // ────────────────────────────────────────────────────────────────────────────
    const vars = submission.vars ?? {};
    const dut = submission.dut as Dut | undefined;
    const process = vars.selectedProcess as Process | undefined;   
@@ -40,43 +50,43 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
    const hasLoadBank = !!(loadBank && loadBank.connected);
    const portName = loadBank?.connected ? loadBank?.portName ?? "" : "";
 
-
-   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(loadBank?.connected ? loadBank?.status ?? null : null);
+   // ────────────────────────────────────────────────────────────────────────────
+   // State
+   // ────────────────────────────────────────────────────────────────────────────
+   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(
+      loadBank?.connected ? loadBank?.status ?? null : null
+   );
+   const [hasLiveStatus, setHasLiveStatus] = useState(false);
    const [minSetpoint, setMinSetpoint] = useState<number | null>(null);
    const [setpoints, setSetpoints] = useState<SetpointConfig[]>([]);
    const [optionIndices, setOptionIndices] = useState<Record<number, number>>({});
-   const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
    const [activeSetpointId, setActiveSetpointId] = useState<number | null>(null);
+   const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
    const [busy, setBusy] = useState(false);
-
-   //const isOffline = !bankStatus;
-
-
-   // ---- DERIVED FLAGS / MESSAGES ----
-   const missingMessages: string[] = [];
-   if (!process) missingMessages.push("Processo de soldadura ainda não foi selecionado.");
-   if (!maxRated) missingMessages.push("Corrente máxima (potência) do DuT não definida.");
-   if (!hasLoadBank) missingMessages.push("Banca de carga não está ligada ou não foi detetada.");
-
    
-  // keep a stable stop() so StrictMode / remounts don’t start twice
+   // keep a stable stop() so StrictMode / remounts don’t start twice
    const stopPollingRef = useRef<null | (() => Promise<void>)>(null);
+
+   // ────────────────────────────────────────────────────────────────────────────
+   // Derived
+   // ────────────────────────────────────────────────────────────────────────────
+   const missingMessages = useMemo(() => {
+      const out: string[] = [];
+      if (!process) out.push("Processo de soldadura ainda não foi selecionado.");
+      if (!maxRated) out.push("Corrente máxima (potência) do DuT não definida.");
+      if (!hasLoadBank) out.push("Banca de carga não está ligada ou não foi detetada.");
+      return out;
+   }, [process, maxRated, hasLoadBank]);
+
 
 
    // ---- Initial min setpoint heuristic ----
    useEffect(() => {
-      /*
-         if (!maxRated) {
-            setMinSetpoint(null);
-            return;
-         }
-      */
-      //same as
       if (!maxRated) return void setMinSetpoint(null);
 
       if (process === "MIGConv") {
-         // For MIGConv we ignore user input; we can show derived 25% value in disabled field
          setMinSetpoint(Math.max(5, maxRated * 0.25));
+         return;
       } else {
          // 5% of max, at least 5 A
          const fallbackMin = Math.max(5, maxRated * 0.05);
@@ -114,11 +124,21 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       (async () => {
          // stop any previous session first (important in dev StrictMode)
          if (stopPollingRef.current) {
+            dbg("Stopping previous polling session (StrictMode safety)");
             await stopPollingRef.current();
             stopPollingRef.current = null;
          }
 
-         const stop = await startLoadBankPolling(portName, (s) => setBankStatus(s), controller.signal);
+         dbg("Starting polling", { portName });
+         const stop = await startLoadBankPolling(
+            portName, 
+            (s) => {
+               setHasLiveStatus(true);
+               setBankStatus(s);
+               updateDutyCycleFromMask(s.contactorsMask ?? 0);
+            }, 
+            controller.signal
+         );
          if (cancelled) {
             await stop();
             return;
@@ -137,9 +157,9 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       };
    }, [hasLoadBank, portName]);
 
-   
-   // ---- GENERATE SETPOINTS ----
-   // ---- Recompute setpoints whenever process / min / max changes ----
+   // ────────────────────────────────────────────────────────────────────────────
+   // Generate setpoints (static list). Actual combo will be re-resolved on click.
+   // ────────────────────────────────────────────────────────────────────────────
    useEffect(() => {
       if (!process || !maxRated) {
          setSetpoints([]);
@@ -160,196 +180,37 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
          resolveLoadBankSetpoint(idx + 1, process, 0, currentA)
       );
 
+      dbg("Generated setpoints", { 
+         process, 
+         minSetpoint, 
+         maxRated, 
+         currents, 
+         configs 
+      });
       setSetpoints(configs);
       setOptionIndices({});
       setPendingSetpointId(null);
       setActiveSetpointId(null);
    }, [process, minSetpoint, maxRated]);
 
-
-
-   // ---- HANDLERS ----
-   // ---- Select setpoint (pending) & cycle combination options ----
-   const handleSetpointClick = async (sp: SetpointConfig) => {
-      if (busy) return;
-      setPendingSetpointId(sp.id);
-
-      // don’t soft-lock the button by disabling on “pending”
-      /*
-      if (sp.options.length > 0) {
-         setOptionIndices((prev) => {
-            const currentIdx = prev[sp.id] ?? -1;
-            const nextIdx = (currentIdx + 1) % sp.options.length;
-            return { ...prev, [sp.id]: nextIdx };
-         });
-      }
-      */
-
-      // UI-only path (no bank) 
-      //if (!hasLoadBank || !portName || !bankStatus) return;
-      if (!hasLoadBank || !portName) return;
-
-      if (!bankStatus) {
+   // ────────────────────────────────────────────────────────────────────────────
+   // Helpers
+   // ────────────────────────────────────────────────────────────────────────────
+   const notifyMissing = () => {
+      if (missingMessages.length) {
          notifications.show({
             color: "orange",
-            title: "Banca sem status",
-            message: "A aguardar primeiro estado válido da banca.",
+            title: "Faltam dados",
+            message: missingMessages.join(" "),
          });
-         return;
+         return true;
       }
-
-      // Safety: you may later check real measured current; for now we at least check contactors
-      /*
-      const contactorsMask = bankStatus.contactorsMask ?? 0;
-      if (contactorsMask !== 0) {
-         console.warn( "[LBCalStep] Recusar mudança de ponto enquanto há corrente/contactores ativos." );
-         notifications?.show?.({
-            color: "orange",
-            title: "Contactores ativos",
-            message: "Recusar mudança de ponto enquanto há corrente/contactores ativos.",
-         });
-      }
-         */
-         
-      const opt = sp.options[0]; // single-option implementation
-      if (!opt) {
-         notifications.show({
-         color: "red",
-         title: "Sem combinação",
-         message: "Não existe combinação válida para este ponto.",
-         });
-         return;
-      }
-
-      // If already active at same mask, do nothing
-      if (activeSetpointId === sp.id && (bankStatus.contactorsMask ?? 0) === opt.mask) return;
-
-      setBusy(true);
-      try {
-         // 1) all OFF
-         const offStatus = await setLoadBankContactors({
-            portName,
-            lastStatus: bankStatus,
-            contactorsMask: 0x0000,
-         });
-         setBankStatus(offStatus);
-
-         // 2) selected ON
-         const newStatus = await setLoadBankContactors({
-            portName,
-            lastStatus: offStatus,
-            contactorsMask: opt.mask,
-         });
-         setBankStatus(newStatus);
-
-         setActiveSetpointId(sp.id);
-      } catch (err) {
-         console.error("[LBCalStep] auto-apply setpoint failed", err);
-
-         // best-effort fail-safe: try to turn OFF again (don’t block UI if it fails)
-         try {
-         if (bankStatus) {
-            await setLoadBankContactors({
-               portName,
-               lastStatus: bankStatus,
-               contactorsMask: 0x0000,
-               timeoutMs: 1200,
-            });
-         }
-         } catch {}
-
-         setActiveSetpointId(null);
-         notifications.show({
-         color: "red",
-         title: "Falha na banca",
-         message: "Falha ao aplicar a carga. Contactores deverão ficar OFF.",
-         });
-      } finally {
-         setBusy(false);
-      }
+      return false;
    };
-
-
-   
-   // ---- Apply load for the currently pending setpoint (activate) ----
-   /*
-   const handleApplyLoad = async () => {
-      if (!hasLoadBank || !portName || !bankStatus) {
-         console.warn("[LBCalStep] load bank not available, ignoring Apply Load");
-         return;
-      }
-      if (pendingSetpointId == null) {
-         console.warn("[LBCalStep] no pending setpoint selected");
-         return;
-      }
-
-      const sp = setpoints.find((s) => s.id === pendingSetpointId);
-      if (!sp) return;
-
-      const idx = optionIndices[sp.id] ?? 0;
-      const opt = sp.options[idx];
-      if (!opt) {
-         console.warn("[LBCalStep] selected setpoint has no resistor option");
-         return;
-      }
-
-      setBusy(true);
-      try {
-         // Safety step 1: set all contactors OFF
-         const offStatus = await setLoadBankContactors({
-            portName,
-            lastStatus: bankStatus,
-            contactorsMask: 0x0000,
-         });
-         setBankStatus(offStatus);
-
-         // Safety step 2: apply selected combination
-         const newStatus = await setLoadBankContactors({
-            portName,
-            lastStatus: offStatus,
-            contactorsMask: opt.mask,
-         });
-         setBankStatus(newStatus);
-         setActiveSetpointId(sp.id);
-      } catch (err) {
-         console.error("[LBCalStep] error applying setpoint", err);
-         // Mantine notification instead of alert?
-         //alert("Falha ao comunicar com a banca de carga.");
-         notifications?.show?.({
-            color: "red",
-            title: "Erro",
-            message: "Falha ao comunicar com a banca de carga.",
-         });
-      } finally {
-         setBusy(false);
-      }
-   };*/
-
-
-   /** Optional helper to force all contactors OFF */
-   /*
-   const handleAllOff = async () => {
-      if (!hasLoadBank || !portName || !bankStatus) return;
-      setBusy(true);
-      try {
-         const offStatus = await setLoadBankContactors({
-            portName,
-            lastStatus: bankStatus,
-            contactorsMask: 0x0000,
-         });
-         setBankStatus(offStatus);
-         setActiveSetpointId(null);
-         setPendingSetpointId(null);
-      } catch (err) {
-         console.error("[LBCalStep] error turning all contactors OFF", err);
-      } finally { setBusy(false); }
-   };
-   */
 
    const handleFinish = async (verdict: Verdict = "pass") => {
       const now = nowIso();
-      
-      //await invoke("close").catch(() => {});
+
       complete({
          id,
          startedAt: submission.steps.find((s) => s.id === id)?.startedAt ?? now,
@@ -358,21 +219,144 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       });
    };
 
-   
+   // ────────────────────────────────────────────────────────────────────────────
+   // Click: resolve live combo (duty-budget aware) and apply load bank contactors
+   // ────────────────────────────────────────────────────────────────────────────
+   const handleSetpointClick = async (sp: SetpointConfig) => {
+      if (busy) return;
+
+      dbg("Setpoint click", sp);
+      if (notifyMissing()) return;
+
+      setPendingSetpointId(sp.id);
+
+      /*
+         if (!hasLoadBank || !portName) return;
+         if (!bankStatus) {
+      */
+      if (!hasLoadBank || !portName || !bankStatus) {
+         notifications.show({
+            color: "blue",
+            title: "Modo UI",
+            message: "Banca de carga não disponível. A seleção é apenas visual.",
+         });
+         setPendingSetpointId(null);
+         return;
+      }
+
+      // Avoid the “no active polling session” race: require at least one live event
+      if (!hasLiveStatus) {
+         notifications.show({
+            color: "orange",
+            title: "A iniciar comunicação",
+            message: "A aguardar primeiro estado do polling.",
+         });
+         setPendingSetpointId(null);
+         return;
+      }
+
+      if (!process) {
+         setPendingSetpointId(null);
+         return;
+      }
+
+      // Re-resolve at click-time so duty budget affects feasibility & ranking.
+      const live = resolveLoadBankSetpoint(sp.id, process, 0, sp.currentA);
+
+      // Keep UI in sync with live labels
+      setSetpoints((prev) => prev.map((p) => (p.id === sp.id ? live : p)));
+
+      const idx = optionIndices[sp.id] ?? 0;
+      const opt = live.options[idx] ?? live.options[0];
+
+      //const opt = sp.options[0]; // single-option implementation
+      if (!opt) {
+         notifications.show({
+            color: "red",
+            title: "Sem combinação",
+            message: "Não existe combinação válida para este ponto.",
+         });
+         setPendingSetpointId(null);
+         return;
+      }
+
+      // If already active at same mask, do nothing
+      if (activeSetpointId === sp.id && (bankStatus.contactorsMask ?? 0) === opt.mask) {
+         dbg("Already active with same mask, ignoring", {
+            spId: sp.id,
+            mask: opt.mask,
+         });
+         setPendingSetpointId(null);
+         return;
+      }
+
+      setBusy(true);
+      try {
+         dbg("Applying contactors OFF -> ON", { spId: sp.id, targetMask: opt.mask });
+
+         // 1) all OFF
+         const offStatus = await setLoadBankContactors({
+            portName,
+            lastStatus: bankStatus,
+            contactorsMask: 0x0000,
+         });
+         setBankStatus(offStatus);
+         updateDutyCycleFromMask(offStatus.contactorsMask ?? 0);
+
+         // 2) selected ON
+         const newStatus = await setLoadBankContactors({
+            portName,
+            lastStatus: offStatus,
+            contactorsMask: opt.mask,
+         });
+         setBankStatus(newStatus);
+         updateDutyCycleFromMask(newStatus.contactorsMask ?? opt.mask);
+
+         setActiveSetpointId(sp.id);
+         dbg("Applied OK", { spId: sp.id, mask: opt.mask });
+      } catch (err) {
+         console.error("[LBCalStep] auto-apply setpoint failed", err);
+
+         // best-effort fail-safe: try to turn OFF again (don’t block UI if it fails)
+         try {
+            if (bankStatus) {
+               await setLoadBankContactors({
+                  portName,
+                  lastStatus: bankStatus,
+                  contactorsMask: 0x0000,
+                  timeoutMs: 1200,
+               });
+            }
+         } catch {}
+
+         setActiveSetpointId(null);
+         notifications.show({
+            color: "red",
+            title: "Falha na banca",
+            message: "Falha ao aplicar a carga. Contactores deverão ficar OFF.",
+         });
+      } finally {
+         setBusy(false);
+         setPendingSetpointId(null);
+      }
+   };
+
+
+
+
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Render
+  // ────────────────────────────────────────────────────────────────────────────
    const rightBadge = hasLoadBank && bankStatus ? (
       <Badge color="green" variant="light">
-         Banca {loadBank.bank_power}A #{loadBank.bank_no} · {portName}
+         Banca {loadBank!.bank_power}A #{loadBank!.bank_no} · {portName}
       </Badge>
    ) : (
       <Badge color="red" variant="light">
          Banca offline
       </Badge>
    );
-
-
-
-
-
 
    return (
       <StepShell 
@@ -387,21 +371,11 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
                <NumberInput
                label="Ponto mínimo (A)"
                value={minSetpoint ?? 0}
-               onChange={
-                  (val) => {
-                     if (typeof val !== "number") return;
-                     /*
-                     if (!maxRated) {
-                        setMinSetpoint(val);
-                        return;
-                     }
-                     const clamped = Math.max(0, Math.min(val, maxRated));
-                     setMinSetpoint(clamped);
-                     */
-                     if (!maxRated) return setMinSetpoint(val);
-                     setMinSetpoint(Math.max(0, Math.min(val, maxRated)));
-                  }
-               }
+               onChange={ (val) => {
+                  if (typeof val !== "number") return;
+                  if (!maxRated) return setMinSetpoint(val);
+                  setMinSetpoint(Math.max(0, Math.min(val, maxRated)));
+               } }
                min={0}
                max={maxRated ?? undefined}
                disabled={!process || !maxRated || process === "MIGConv"}
@@ -438,9 +412,9 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
                         key={`${sp.id}-btn`}
                         h={'auto'}
                         variant={isActive ? "filled" : isPending ? "outline" : "default"}
-                        onClick={() => handleSetpointClick(sp)}
-                        loading={busy}
-                        disabled={isPending}
+                        onClick={() => void handleSetpointClick(sp)}
+                        loading={busy && isPending}
+                        disabled={busy}
                         >
                            <Stack gap={0}>
                               <Text pt={'xs'} size="sm">Ponto {sp.id}:</Text>

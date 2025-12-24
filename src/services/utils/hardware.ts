@@ -10,7 +10,7 @@ import {
 } from "./lbProtocol";
 
 import type { InterlockState } from "@/types/generalTypes"; // DB_HOST
-import type { Roundtrip, LoadBankProbe, LoadBankStatus, LoadBankHealth } from "@/types/commTypes";
+import type { Roundtrip, LoadBankProbe, LoadBankStatus } from "@/types/commTypes"; // , LoadBankHealth
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
@@ -18,7 +18,7 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
 
-
+/*
 function toHex(bytes: number[]): string {
    return bytes.map(b => b
       .toString(16)
@@ -26,6 +26,7 @@ function toHex(bytes: number[]): string {
       .padStart(2, "0")
    ).join(" ");
 }
+*/
 
 
 

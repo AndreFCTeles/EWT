@@ -211,6 +211,7 @@ export type DutProfile = {
    dutSnapshot: Dut;                                     // canonical DuT view
    productId?: string;
    productSnapshot?: ProductData;
+
    /*
    // Human ID
    brand: string;

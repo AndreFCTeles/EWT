@@ -2,7 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { CRC8_TABLE, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
 import type { LoadBankFrame, LoadBankStatus, LoadBankHealth } from "@/types/commTypes";
-import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
+import { 
+   DEV_ECHO_BAUD, 
+   DEV_ECHO_DELAY, 
+   DEV_ECHO_PORT,
+   DEV_ECHO_POWER, 
+   DEV_ECHO_BANK_NO,
+   DEV_ECHO_DEBUG_BANK 
+} from "@/dev/devConfig";
 
 
 
@@ -15,9 +22,7 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 function crc8LoadBank(frame: Uint8Array): number {
    if (frame.length < 13) throw new Error("frame too short for CRC");
    let crc = 0;
-   for (let i = 1; i < 13; i++) {
-      crc = CRC8_TABLE[crc ^ frame[i]];
-   }
+   for (let i = 1; i < 13; i++) { crc = CRC8_TABLE[crc ^ frame[i]]; }
    return crc;
 }
 
@@ -43,6 +48,7 @@ function decodeU16(hi: number, lo: number): number {
 
 
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 
 

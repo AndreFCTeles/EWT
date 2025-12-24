@@ -49,7 +49,7 @@ export class DutyCycleBudget {
    private currentMask = 0;
    private lastChangeMs = Date.now();
    private intervalsByBit = new Map<number, Interval[]>();
-   constructor(private spec: ResistorSpec) {
+   constructor(spec: ResistorSpec) {
       const w = spec.overloadWindows?.[0];
       this.cycleMs = w?.cycleMs ?? 120_000;
    }

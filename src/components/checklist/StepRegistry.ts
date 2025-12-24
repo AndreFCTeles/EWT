@@ -38,13 +38,13 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
 
    specs:/*-----------------*/SkipStep,
 
-   interlocks:/*------------*/SkipStep,//InterlocksStep,
-   connections:/*-----------*/SkipStep,//ConnectionsStep,
+   interlocks:/*------------*/SkipStep, //InterlocksStep,
+   connections:/*-----------*/SkipStep, //ConnectionsStep,
    selftests:/*-------------*/SkipStep,
    calstatus:/*-------------*/SkipStep,
    calibration:/*-----------*/LBCalStep,
 
-   ocv:/*-------------------*/SkipStep,//OcvStep,
+   ocv:/*-------------------*/SkipStep, //OcvStep,
 
    'proc:MIGInv:nominals':/**/SkipStep,
    'proc:MIGInv:start':/*---*/SkipStep,
