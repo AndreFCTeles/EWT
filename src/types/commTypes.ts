@@ -254,8 +254,9 @@ export type CalibrationSetpoint = {
 
 export type ContactorOption = {
    mask: number;              // 16-bit mask, C1..C16
+   comboDisplay: string[];
    comboLabel: string;
-   errorLabel: string;        // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
+   errorLabel: string[];        // e.g. "R1+R3+R6" or "≈175 A @ 44 V"
    errorPercent: number;      // |I_actual - I_target| / I_target * 100
 };
 

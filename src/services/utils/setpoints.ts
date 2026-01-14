@@ -219,6 +219,10 @@ export function resolveLoadBankSetpoint(
       .slice()
       .sort()
       .join(" + ");
+   const comboDisplay = combo.branches
+      .map((b) => b.id)
+      .slice()
+      .sort();
 
 
    // Prefer showing BOTH:
@@ -235,17 +239,19 @@ export function resolveLoadBankSetpoint(
          : `${Math.round(combo.maxOnMs / 1000)}s`;
 
    const errorLabel = [
-      `I≈${combo.approxCurrentA.toFixed(0)}A`,
-      `Ierr=${iErrPct.toFixed(1)}%`,
-      `Req≈${combo.reqOhm.toFixed(4)}Ω`,
-      `Rerr=${rErrPct.toFixed(1)}%`,
-      `tOn=${maxOn}`,
-      `usedMax=${Math.round(combo.usedOnMsMax / 1000)}s/${Math.round(combo.cycleMs / 1000)}s`,
-   ].join(" · ");
+      `I ≈ ${combo.approxCurrentA.toFixed(0)}A`,
+      `Ierr = ${iErrPct.toFixed(1)}%`,
+      `Req ≈ ${combo.reqOhm.toFixed(4)}Ω`,
+      `Rerr = ${rErrPct.toFixed(1)}%`,
+      `tOn = ${maxOn}`,
+      `usedMax = ${Math.round(combo.usedOnMsMax / 1000)}s/${Math.round(combo.cycleMs / 1000)}s`,
+      `${combo.u2V} V`,
+   ];//.join(" · ");
 
    const options: ContactorOption[] = [
       {
          mask: combo.mask,//mask,
+         comboDisplay,
          comboLabel,
          errorLabel,
          errorPercent: rErrPct,//relErrPercentR,
@@ -604,7 +610,8 @@ function findBestComboForCurrent(
    // Helpful peek at the top few
    const top = candidates.slice(0, 5).map((c) => ({
       mask: "0x" + c.mask.toString(16),
-      branches: c.branches.map((b) => b.id).join("+"),
+      branches: c.branches.map((b) => b.id),
+      branchesLabel: c.branches.map((b) => b.id).join("+"),
       RerrPct: (c.errR * 100).toFixed(3),
       IerrPct: (c.errI * 100).toFixed(3),
       maxOnMs: c.maxOnMs,

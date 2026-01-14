@@ -23,3 +23,4 @@ export function serialToFormatDate(value: number | string | undefined) {
 }
 
 export const roundTo5 = (value: number): number => Math.round(value / 5) * 5;
+

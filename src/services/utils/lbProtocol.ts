@@ -5,10 +5,7 @@ import type { LoadBankFrame, LoadBankStatus, LoadBankHealth } from "@/types/comm
 import { 
    DEV_ECHO_BAUD, 
    DEV_ECHO_DELAY, 
-   DEV_ECHO_PORT,
-   DEV_ECHO_POWER, 
-   DEV_ECHO_BANK_NO,
-   DEV_ECHO_DEBUG_BANK 
+   DEV_ECHO_PORT
 } from "@/dev/devConfig";
 
 
@@ -48,7 +45,7 @@ function decodeU16(hi: number, lo: number): number {
 
 
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+//const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 
 

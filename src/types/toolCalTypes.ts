@@ -36,6 +36,7 @@ export type SimpleTest = {
    pass: boolean; // delta <= emaAllowed
 
    ok: boolean; // “APTO/NAO APTO”
+   usable?: boolean; // legacy
 };
 
 export type SimpleTestOld = {

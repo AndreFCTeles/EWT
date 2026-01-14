@@ -28,7 +28,8 @@ export const useCalibrations = (params: {
    useEffect(() => {
       const ac = new AbortController();
       (async () => {
-         setLoading(true); setErr(null);
+         setLoading(true); 
+         setErr(null);
          try {
             const rows = await listSimpleCalibrations({
                instrumentCode: params.instrumentCode,

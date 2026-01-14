@@ -1,4 +1,4 @@
-import React, {  useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useMachine } from '@xstate/react';
 
 import { checklistMachine, wasCompleted, type StepRuntimeProps } from './pipeline';

@@ -9,10 +9,13 @@ const API_BASE = import.meta.env.VITE_DB_HOST
 
 
 export const pingHealth = async (): Promise<boolean> => {
+   /*
    try {
-      const r = await fetch(`${API_BASE}/health`, { method: "GET", cache: "no-store" });
+      const r = await fetch(`${API_BASE}/api/health`, { method: "GET", cache: "no-store" });
       return r.ok;
    } catch { return false; }
+   */
+   return false; // TODO FIX: descomentar, return: true simplesmente nao mostra guardados localmentecd
 };
 
 export const listSimpleCalibrations = async (params: ListParams = {}) => {

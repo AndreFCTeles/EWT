@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import { Button, Group, NumberInput, Stack, Text, Badge } from "@mantine/core";
+import { Button, NumberInput, Title, Text, Badge, SimpleGrid, Flex, ScrollArea, Box } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { IconBolt } from "@tabler/icons-react";//, IconInfoSmall
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
@@ -17,6 +18,8 @@ import { nowIso } from "@utils/generalUtils";
 import type { Dut, Process, Verdict } from "@/types/checklistTypes"; 
 import type { LoadBankProbe, LoadBankStatus, SetpointConfig } from "@/types/commTypes";
 import { DEV_ECHO_COUNT } from "@/dev/devConfig";
+//import DevEchoPcbTest from "@/dev/DevEchoPcbTest";
+import SetpointButton from "@/components/setpoints/setpointsSelector";
 
 
 
@@ -26,7 +29,17 @@ function dbg(...args: any[]) {
 }
 
 
-export const LBCalStep: React.FC<StepRuntimeProps> = ( {
+
+
+
+
+
+
+
+
+
+
+const LBCalStep: React.FC<StepRuntimeProps> = ( {
    id,
    submission,
    isActive,
@@ -63,7 +76,11 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
    const [activeSetpointId, setActiveSetpointId] = useState<number | null>(null);
    const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
    const [busy, setBusy] = useState(false);
-   
+
+   const [POWER, setPOWER] = useState(false);
+   const togglePOWER = () => setPOWER(!POWER);
+
+
    // keep a stable stop() so StrictMode / remounts don’t start twice
    const stopPollingRef = useRef<null | (() => Promise<void>)>(null);
 
@@ -77,6 +94,9 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       if (!hasLoadBank) out.push("Banca de carga não está ligada ou não foi detetada.");
       return out;
    }, [process, maxRated, hasLoadBank]);
+
+
+
 
 
 
@@ -192,6 +212,10 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       setPendingSetpointId(null);
       setActiveSetpointId(null);
    }, [process, minSetpoint, maxRated]);
+
+
+
+
 
    // ────────────────────────────────────────────────────────────────────────────
    // Helpers
@@ -345,9 +369,18 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
 
 
 
+
+
+
+
+
+
+
   // ────────────────────────────────────────────────────────────────────────────
   // Render
   // ────────────────────────────────────────────────────────────────────────────
+
+   // Badge
    const rightBadge = hasLoadBank && bankStatus ? (
       <Badge color="green" variant="light">
          Banca {loadBank!.bank_power}A #{loadBank!.bank_no} · {portName}
@@ -357,6 +390,44 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
          Banca offline
       </Badge>
    );
+   
+   // Resistor Combo display
+   const displayResistors = (r:string[]) => {
+      const active = new Set(r);
+
+      return <SimpleGrid cols={4} spacing={"1px"} verticalSpacing={"1px"}>
+         {Array.from({ length: 8 }, (_, k) => {
+            const id = `R${k+ 1}`;         
+            const isOn = active.has(id);
+            return (
+               <Flex 
+               key={`resistor-${id}`}
+               className="resistorDisplay"
+               align={"center"}
+               justify={"center"}
+               mb={0} 
+               pb={0} 
+               style={{
+                  borderColor:isOn?"rgba(64, 192, 87, 1)":"rgba(128, 128, 128, 0.2)",
+                  color:isOn?"rgba(64, 192, 87, 1)":"rgba(128, 128, 128, 0.2)",
+               }} >{id}</Flex> 
+            );
+         })}
+      </SimpleGrid>  
+   };
+
+   // Setpoint area headers
+   const Headers = () => (
+      <SimpleGrid cols={2} spacing={"5px"} verticalSpacing={"5px"}>
+         <Title order={5} ta={"center"} c={"dimmed"}>PONTOS</Title>
+         <SimpleGrid cols={2}>
+            <Title order={5} ta={"center"} c={"dimmed"}>CONTROLADOR</Title>   
+            <Title order={5} ta={"center"} c={"dimmed"}>FERRAMENTA</Title>   
+         </SimpleGrid>
+      </SimpleGrid>
+   );
+
+
 
    return (
       <StepShell 
@@ -364,83 +435,157 @@ export const LBCalStep: React.FC<StepRuntimeProps> = ( {
       canGoBack={canGoBack} 
       onBack={goBack}
       right={rightBadge}>
-         <Stack gap="md">
-            <Text fw={600}>Pontos de calibração (corrente)</Text>
+         <Flex 
+         direction={"column"}
+         gap="md" 
+         p={0}
+         m={0}
+         h={"100%"}
+         mih={"100%"}
+         //align="space-evenly"
+         >
 
-            <Group gap="md">
+            {/* Min, POWER */}
+            <SimpleGrid 
+            w={"100%"} 
+            p={0}
+            m={0}
+            cols={2}>
                <NumberInput
-               label="Ponto mínimo (A)"
+               w={"70%"}
+               m={"auto"}
+               suffix={" A"}
+               size="md"
+               min={0}
+               max={maxRated ?? undefined}
+               stepHoldDelay={500}
+               stepHoldInterval={100}
+               label={"Ponto mínimo (A)"}
                value={minSetpoint ?? 0}
+               disabled={!process || !maxRated || process === "MIGConv"}
                onChange={ (val) => {
                   if (typeof val !== "number") return;
                   if (!maxRated) return setMinSetpoint(val);
                   setMinSetpoint(Math.max(0, Math.min(val, maxRated)));
                } }
-               min={0}
-               max={maxRated ?? undefined}
-               disabled={!process || !maxRated || process === "MIGConv"}
                description={
                   process === "MIGConv"
                   ? "MIG Convencional: 25% da corrente máxima"//"MIG Convencional: usa 25%, 50%, 75% e 100% da corrente máxima"
-                  : "(ajustável neste passo enquanto não for capturada automaticamente)"
+                  : "(ajustável enquanto não for capturada automaticamente)"
                } />
 
-               <NumberInput
-               label="Ponto máximo (A)"
-               value={maxRated ?? 0}
-               disabled
-               description={
-                  maxRated
-                  ? "Corrente máxima escolhida (PickPower)"
-                  : "Selecione a potência no passo anterior"
-               } />
-            </Group>
-
-            <Group gap="sm" w={"100%"} justify="center">
-               {setpoints.map(sp => {
-                  const idx = optionIndices[sp.id] ?? 0;
-                  const opt = sp.options[idx];
-                  const isPending = pendingSetpointId === sp.id;
-                  const isActive = activeSetpointId === sp.id;
-
-                  return (
-                     <Stack key={sp.id} gap={'xs'} align="center">
-                        {opt && (<Text size="xs">{opt.comboLabel}</Text>)}
-                        {opt && (<Text size="xs">{opt.errorLabel}</Text>)}
-                        {sp.options.length > 1 && (<Text size="xs" c="dimmed">Clique para alternar combinação ({idx + 1}/{sp.options.length})</Text>)}
-                        <Button
-                        key={`${sp.id}-btn`}
-                        h={'auto'}
-                        variant={isActive ? "filled" : isPending ? "outline" : "default"}
-                        onClick={() => void handleSetpointClick(sp)}
-                        loading={busy && isPending}
-                        disabled={busy}
-                        >
-                           <Stack gap={0}>
-                              <Text pt={'xs'} size="sm">Ponto {sp.id}:</Text>
-                              <Text pb={'xs'}  size="sm">{sp.currentA} A</Text>
-                           </Stack>
-                        </Button>
-                        {isPending && !isActive && (<Text size="xs" c="blue">Pendente (contactores OFF)</Text>)}
-                        {isActive && (<Text size="xs" c="green">Ativo (carga aplicada)</Text>)}
-                     </Stack>
-                  );
-               })}
-            </Group>
+               <Flex direction={"column"} w={"100%"} justify={"center"} align={"center"} gap={0}>
+                  <Button
+                  h={"100%"}
+                  p={"md"}
+                  fullWidth
+                  onClick={togglePOWER}
+                  color={POWER?"red":"green"}
+                  disabled={
+                     !process || 
+                     !maxRated || 
+                     busy
+                  } >
+                     <Flex direction={"column"} align={"center"}>
+                        <Text className="POWERLABEL">{POWER?"SUSPENDER":"APLICAR CARGA"}</Text>
+                        <IconBolt size={100} />
+                     </Flex>
+                  </Button> {/* usar IconFlame when cooldown */}
+               </Flex>
+            </SimpleGrid>
 
 
-            <Stack gap="sm">
-               {/*<Button
-               onClick={handleApplyLoad}
-               disabled={
-                  !process || 
-                  !maxRated || 
-                  busy
-               } >Aplicar carga no ponto selecionado</Button>*/}
+            {/* Setpoint Selectors */}
+            <ScrollArea>
+               <Flex direction={"column"}>
 
-               <Button variant="default" onClick={() => handleFinish("pass")}>Concluir calibração</Button>
-            </Stack>
-         </Stack>
+                  <SimpleGrid cols={{base:1, md:2}} spacing={"20px"} verticalSpacing={"20px"}>
+                     {setpoints.map((sp, index) => {
+                        const idx = optionIndices[sp.id] ?? 0;
+                        const opt = sp.options[idx];
+                        const isPending = pendingSetpointId === sp.id;
+                        const isActive = activeSetpointId === sp.id;
+
+                        const showBaseHeader = index === 0; 
+                        const showMdHeader = index < 2;
+
+                        return (
+                           <Box>
+                              {/* Headers */}
+                              {showBaseHeader && ( <Box hiddenFrom="md"><Headers /></Box> )}
+                              {showMdHeader && ( <Box visibleFrom="md"><Headers /></Box> )}
+
+                              <SimpleGrid cols={2} spacing={"5px"} verticalSpacing={"5px"}>
+                                 {/*opt && ( <Text size="xs" mb={0} pb={0} lh={"100%"}>{opt.comboLabel}</Text>)*/} {/* caso queira mostrar a string com combo */} 
+
+                                 <SetpointButton 
+                                 key={sp.id}
+                                 ampsText={`${sp.currentA} A`}
+                                 setpointLine={opt.errorLabel[6]}
+                                 infoLines={[
+                                    `${opt.errorLabel[0]}  ·  ${opt.errorLabel[1]}`,
+                                    `${opt.errorLabel[2]}  ·  ${opt.errorLabel[3]}`,
+                                    `${opt.errorLabel[4]}  ·  ${opt.errorLabel[5]}`,
+                                 ]}
+                                 color={isActive ? "green" : "gray"}
+                                 variant={isActive ? "filled" : isPending ? "default" : "light"}
+                                 onClick={() => void handleSetpointClick(sp)}
+                                 loading={busy && isPending}
+                                 disabled={busy}
+                                 resistors={displayResistors(opt.comboDisplay)}
+                                 />
+
+                                 <SimpleGrid cols={2} spacing={"5px"} verticalSpacing={"5px"}>
+                                    {/* AMP Values */}
+                                    <NumberInput // DuT
+                                    my={"auto"}
+                                    min={0} 
+                                    suffix={" A"}
+                                    placeholder={`${sp.currentA} A`} 
+                                    />
+                                    <NumberInput // Tool
+                                    my={"auto"}
+                                    min={0} 
+                                    suffix={" A"}
+                                    placeholder={`${sp.currentA} A`} 
+                                    />
+
+                                    {/* VOLT Values */}
+                                    <NumberInput // Dut
+                                    my={"auto"}
+                                    min={0} 
+                                    suffix={" V"}
+                                    placeholder={opt.errorLabel[6]} 
+                                    />
+                                    <NumberInput // Tool
+                                    my={"auto"}
+                                    min={0} 
+                                    suffix={" V"}
+                                    placeholder={opt.errorLabel[6]} 
+                                    />
+                                 </SimpleGrid>
+
+                              </SimpleGrid>
+                           </Box>
+                        );
+                     })}
+                  </SimpleGrid>
+
+               </Flex>
+            </ScrollArea>
+
+
+            
+            {/* NEXT */} 
+            <Button 
+            variant="filled" 
+            size="xl"
+            onClick={() => handleFinish("pass")}
+            >Concluir calibração</Button>
+
+            {/*<DevEchoPcbTest />*/}
+         </Flex>
+
       </StepShell>
    );
 };
