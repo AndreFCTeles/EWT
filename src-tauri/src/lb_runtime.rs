@@ -88,7 +88,7 @@ fn decode_u8(encoded: u8) -> u8 {
 
 fn decode_u16(hi: u8, lo: u8) -> u16 {
     let encoded = ((hi as u16) << 8) | (lo as u16);
-    encoded.wrapping_sub(0x0002)
+    encoded.wrapping_sub(0x0202) //0x0002
 }
 
 fn parse_frame(frame: &[u8], port_name: &str) -> Option<LoadBankStatus> {

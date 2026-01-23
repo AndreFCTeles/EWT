@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Button, NumberInput, Select, Stack, TextInput } from '@mantine/core';
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import type { Submission } from '@/types/checklistTypes';
+//import type { Submission } from '@/types/checklistTypes';
 import { nowIso } from '@utils/generalUtils';
 import { StepShell } from '../checklist/StepShell';
 
 export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
    id,
-   role,
+   //role,
    canGoBack,
    goBack,
    submission,
@@ -42,15 +42,18 @@ export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
             series: local.series,
          },
       }, { dut: local, } );
+      return 
    };
+   const finishBTN = () => <Button size="xl" onClick={onFinish}>Confirmar</Button>; 
 
    return (
       <StepShell
       //id={id}
-      title="Confirmar detalhes do equipamento sob teste"
+      title="Confirmar / Editar"
       //role={role}
       canGoBack={canGoBack}
       onBack={goBack}
+      right={finishBTN()}
       //onNext={onFinish}
       >
          <Stack>
@@ -93,7 +96,6 @@ export const DutInfoStep: React.FC<StepRuntimeProps> = ( {
                onApplyChange('ratedCurrent', local.ratedCurrent); // placeholder; extend Dut type for ocv
                (local as any).ocv = ocv;
             }} />
-            <Button onClick={onFinish}>continuar</Button>
          </Stack>
       </StepShell>
    );

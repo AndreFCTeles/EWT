@@ -24,3 +24,7 @@ export function serialToFormatDate(value: number | string | undefined) {
 
 export const roundTo5 = (value: number): number => Math.round(value / 5) * 5;
 
+export const maskHex = (mask?: number) => {
+   if (mask == null) return "—";
+   return "0x" + mask.toString(16).toUpperCase().padStart(4, "0");
+}

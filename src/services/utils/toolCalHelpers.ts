@@ -10,6 +10,7 @@ export const groupByKind = (tests: SimpleTest[]) =>
    }, {});
 
 
+/*
 export const pickClosestReference = (
    tests: SimpleTest[],
    kind: SimpleTest["kind"],
@@ -22,3 +23,4 @@ export const pickClosestReference = (
       Math.abs(t.reference - target) < Math.abs(best.reference - target) ? t : best
    );
 }
+*/

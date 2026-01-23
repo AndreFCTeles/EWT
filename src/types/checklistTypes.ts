@@ -153,6 +153,7 @@ export type Submission = {
    vars?: {
       manualSelect?: boolean;
       selectedProcess?: Process;
+      minPowerA?: number;
       powerA?: RatedCurrent;
       brand?: string;
       productData?: ProductData;

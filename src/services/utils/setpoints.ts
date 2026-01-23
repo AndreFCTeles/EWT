@@ -1,5 +1,5 @@
 import { DEV_ECHO_COUNT, DEV_ECHO_REL_ERROR } from "@/dev/devConfig";
-import { LB_BRANCHES, RDP4000 } from "@/types/commTypes";
+import { LB_BRANCHES, RDP4000 } from "@/types/calibrationTypes";
 import { roundTo5 } from "./generalUtils";
 import type { Process } from "@/types/checklistTypes";
 import type { 
@@ -8,7 +8,7 @@ import type {
    SetpointConfig, 
    ComboCandidate, 
    ResistorSpec
-} from "@/types/commTypes";
+} from "@/types/calibrationTypes";
 
 
 

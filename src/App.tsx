@@ -48,6 +48,7 @@ import {
 import { Submission } from '@/types/checklistTypes';
 import { getInitialSubmission } from './dev/bootstrap';
 import CalibrationViewer from './components/toolcal/CalibrationViewer';
+import { initLoadBankMonitoring } from './services/hw/loadBankRuntimeStore';
 
 
 
@@ -175,6 +176,8 @@ const App: React.FC  = () => {
          } finally { setAuthBooting(false); }       
       } )();
    }, []);
+   // Estado da conexão banca
+   useEffect(() => { initLoadBankMonitoring().catch(console.error); }, []);
 
 
 
@@ -183,7 +186,7 @@ const App: React.FC  = () => {
 
 
    /* |--- JSX / RENDER APP ---| */
-   return (<>
+   return (
       <AppShell 
       layout="alt"
       transitionTimingFunction="ease"
@@ -230,6 +233,7 @@ const App: React.FC  = () => {
                         onOpenToolCalibration={openViewer}
                         />
 
+                        {/*
                         <Button 
                         fullWidth
                         variant='subtle'
@@ -240,6 +244,7 @@ const App: React.FC  = () => {
                            console.log('toggle adminview'); 
                            setUiView(uiView==='basic'?'advanced':'basic')
                         }}>{uiView==='basic'?'Advanced':'Basic'}</Button>
+                        */}
                      </Flex>
                   )}
                </AppShell.Navbar>
@@ -371,10 +376,7 @@ const App: React.FC  = () => {
          </Drawer>
 
       </AppShell>
-
-
-
-   </>)
+   )
 }
 
 export default App

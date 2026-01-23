@@ -17,7 +17,7 @@ import {
    Divider,
 } from "@mantine/core";
 import { invoke } from "@tauri-apps/api/core";
-import { Roundtrip } from "@/types/commTypes";
+import { Roundtrip } from "@/types/loadBankTypes";
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_PORT } from "@/dev/devConfig";
 
 type Props = {

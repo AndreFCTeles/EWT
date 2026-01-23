@@ -22,7 +22,10 @@ export default function useClock() {
             if (mounted) setNow(payload.epoch_ms);
          });
       })();
-      return () => { mounted = false; unlisten?.(); };
+      return () => { 
+         mounted = false; 
+         unlisten?.(); 
+      };
    }, []);
    return now; // epoch ms
 }

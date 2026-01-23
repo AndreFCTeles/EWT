@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { invoke } from "@tauri-apps/api/core";
 
-import { probeConnectedLB } from '@utils/hardware';
+import { detectLoadBank } from '@/services/hw/hardware';
 import { nowIso } from '@utils/generalUtils';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
-import type { LoadBankProbe, LoadBankStatus } from '@/types/commTypes';
+import type { LoadBankProbe, LoadBankStatus } from '@/types/loadBankTypes';
 import { DEV_ECHO_ENABLED, DEV_ECHO_PORT, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from '@/dev/devConfig'
 
 
@@ -24,7 +24,6 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
 } ) => {
    useEffect(() => {
       if (!isActive) return;
-
       let cancelled = false;
 
       (async () => {
@@ -35,12 +34,11 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
 
          let probe: LoadBankProbe;
          try {
-            probe = await probeConnectedLB();
+            probe = await detectLoadBank();
          } catch (err) {
             console.error("[DetectLoadBank] Probe error", err);
 
             if (cancelled) return;
-
 
             complete({
                id,

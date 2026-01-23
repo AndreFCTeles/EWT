@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Button, Group, Loader, ScrollArea, Stack, Text } from '@mantine/core';
+import { Button, Loader, Stack, Text,Flex, Box, SimpleGrid, RangeSlider, Slider, NumberInput, Switch, Title } from '@mantine/core';
+import { notifications } from "@mantine/notifications";
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
-//import type { RatedCurrent, Process } from '@/types/protocolTypes';
 
 import { fetchBrands } from '@/services/api/epmApi';
 import { nowIso } from '@utils/generalUtils';
 import { API_URL } from '@/lib/config';
-import { Process, RatedCurrent } from '@/types/checklistTypes';
+import { Process} from '@/types/checklistTypes';//, RatedCurrent 
 import { PROCESSES, POWERS } from '@/types/checklistTypes';
+import classes from '@/styles/PPButtons.module.css'
 
 
-
+   const notify = (msg: string) => {
+      notifications.show({
+         color: "orange",
+         title: "Faltam dados",
+         message: msg,
+      });
+   };
 
 
 
@@ -21,34 +28,105 @@ import { PROCESSES, POWERS } from '@/types/checklistTypes';
 
 
 // ---- PickProcess ----
-export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
+export const PickProcessStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   submission,
+   canGoBack, 
+   goBack, 
+   complete
+} ) => {
+   const [selectedProcess, setSelectedProcess] = useState<Process | undefined>(submission?.vars?.selectedProcess);
+   const [selectedPhase, setSelectedPhase] = useState();
+
    const pick = (p: Process) => {
-      const now = nowIso();
       complete(
          { 
             id, 
-            startedAt: now, 
-            endedAt: now, 
+            startedAt: nowIso(), 
+            endedAt: nowIso(), 
             inputs: { process: p }, 
             verdict: 'pass' 
          }, { selectedProcess: p }
       );
    };
 
+   const NextBTN = () =>   <Button 
+                           size="xl"
+                           onClick={() => 
+                              selectedProcess ? pick(selectedProcess)
+                              : notify("Selecione processo antes de prosseguir")
+                           }>Confirmar</Button>
    return (
       <StepShell 
-      title="Selecione o processo de soldadura" 
+      title="Tipo de soldadura" 
       canGoBack={canGoBack} 
-      onBack={goBack}>
-         <Group mt="xs">
-            {PROCESSES.map(p => (
-               <Button key={p} onClick={() => pick(p)}>{
-                  p === "MIGConv" ? "MIG Conv." : 
-                  p === "MIGInv" ? "MIG Inverter" :
-                  p 
-               }</Button>
-            ))}
-         </Group>
+      onBack={goBack}
+      right={NextBTN()}>
+         <Flex
+         w={"100%"}
+         h={"100%"}>   
+            <SimpleGrid 
+            w={"70%"}
+            cols={2}
+            className={classes.PPRoot}>
+               {PROCESSES.map(p => (
+                  <Button 
+                  key={p} 
+                  className={classes.PPBtn} 
+                  variant={selectedProcess === p ? 'filled' : 'outline'}
+                  onClick={() => setSelectedProcess(p)}>{
+                     p === "MIGConv" ? "MIG Conv." : 
+                     p === "MIGInv" ? "MIG Inverter" :
+                     p 
+                  }</Button>
+               ))}
+            </SimpleGrid>
+
+            {/* Dyn option selectors */}
+            <Box w={"30%"}>
+               <Title order={2} ta={"center"} mb={0} pb={0}>Tensão de Vazio</Title>
+               <Flex
+               w={"100%"} 
+               pb={"md"}
+               justify={'space-around'}>
+                  <NumberInput />
+               </Flex>
+
+               <Title order={2} ta={"center"} mb={0} pb={0}>{
+                  selectedProcess === 'MIGInv' 
+                  ? 'Tensão'
+                  : 'Corrente'
+               } de Controlo</Title>
+               <Flex
+               w={"100%"} 
+               pb={"md"}
+               justify={'space-around'}>
+                  <NumberInput />
+               </Flex>
+
+               <Title order={2} ta={"center"} mb={0} pb={0}>Tensão de alimentação</Title>
+               <Flex
+               w={"100%"} 
+               pb={"md"}
+               justify={'center'}
+               align={'center'}>
+                  <Stack align='flex-end' p={0} gap={0}>
+                     <Text m={0} p={0}>230V AC</Text>
+                     <Text m={0} p={0} fw={600} size={"sm"} c={"dimmed"}>(monofásica)</Text>
+                  </Stack>
+                  <Switch 
+                  classNames={classes} 
+                  mx={"xs"}
+                  size={'xl'}
+                  radius={"sm"}
+                  />
+                  <Stack align='flex-start' p={0} gap={0}>
+                     <Text m={0} p={0}>400V AC</Text>
+                     <Text m={0} p={0} fw={600} size={"sm"} c={"dimmed"}>(trifásica)</Text>
+                  </Stack>
+               </Flex>
+            </Box>
+         </Flex>
       </StepShell>
    );
 };
@@ -59,29 +137,138 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goB
 
 
 // ---- PickPower ----
-export const PickPowerStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
-   const pick = (a: RatedCurrent) => {
-      const now = nowIso();
-      complete(
-         { 
-            id, 
-            startedAt: now, 
-            endedAt: now, 
-            inputs: { ratedCurrent: a }, 
-            verdict: 'pass' 
-         }, { powerA: a }
-      );
+export const PickPowerStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   submission,
+   canGoBack, 
+   goBack, 
+   complete 
+} ) => {
+   // min max inits
+   const process = submission?.vars?.selectedProcess;
+   const minPowerVar = submission?.vars?.minPowerA ? submission.vars.minPowerA : 15
+   const powerVar = submission?.vars?.powerA ? submission.vars.powerA : 600
+   const [sliderMin, setSliderMin] = useState<number>(minPowerVar);
+   const [sliderMax, setSliderMax] = useState<number>(powerVar);
+   const [sliderRange, setSliderRange] = useState<[number,number]>([sliderMin,sliderMax]);
+   // min max updates
+   useEffect(()=>{
+      setSliderRange([sliderMin,sliderMax]);
+   }, [sliderMin, sliderMax])
+   useEffect(()=>{
+      setSliderMin(sliderRange[0]);
+      setSliderMax(sliderRange[1]);
+   }, [sliderRange])
+
+   
+   // NEXT
+   const pick = (mina: number, a: number) => {
+      complete({ 
+         id, 
+         startedAt: nowIso(), 
+         endedAt: nowIso(), 
+         inputs: { ratedCurrent: a }, 
+         verdict: 'pass' 
+      }, { 
+         minPowerA: process !== 'MIGConv' ? mina : null,
+         powerA: a 
+      });
    };
 
+   // Render
+   const NextBTN = () =>   <Button 
+                           size="xl"
+                           onClick={() => pick(sliderMin, sliderMax)}
+                           >Confirmar</Button>
+   
    return (
       <StepShell 
+      title="Potência" 
       canGoBack={canGoBack} 
-      onBack={goBack}>
-         <Group mt="xs">
-            {POWERS.map(a => (
-               <Button key={a} onClick={() => pick(a)}>{a}A</Button>
-            ))}
-         </Group>
+      onBack={goBack}
+      right={NextBTN()}> 
+         <Stack className={classes.PPRoot} w={"100%"} >
+
+            <Box h={"40%"} w={"100%"} style={{ overflow: "hidden"}}>
+               <Flex h={"100%"} align={"center"} justify={"center"}> 
+                  
+                  {process !== 'MIGConv' && 
+                     <NumberInput 
+                     min={15}
+                     max={1000}
+                     size="xl"
+                     suffix=' A'
+                     stepHoldDelay={500}
+                     stepHoldInterval={10}
+                     value={sliderMin}
+                     label={"Mínimo"}
+                     onChange={(val) => { setSliderMin(Number(val)) }} />
+                  }
+
+                  {process === 'MIGConv' ? 
+                     <Slider 
+                     w={"100%"}
+                     mx={"md"}
+                     color="blue"
+                     size="xl"
+                     domain={[0,1000]}
+                     labelAlwaysOn
+                     min={15}
+                     max={1000}
+                     value={sliderMax}
+                     onChange={setSliderMax}
+                     marks={[ // talvez usar marcas dinamicas apenas em viewports grandes
+                        { value: 200, label: "200" },
+                        { value: 250, label: "250" },
+                        ...POWERS.map( a => ( { value: a, label: a.toString() } ))
+                     ]} />
+                  :
+                     <RangeSlider 
+                     w={"100%"}
+                     mx={"md"}
+                     color="blue"
+                     size="xl"
+                     domain={[0,1000]}
+                     labelAlwaysOn
+                     min={15}
+                     max={1000}
+                     value={sliderRange}
+                     onChange={setSliderRange}
+                     marks={[ //talvez usar marcas dinamicas apenas em viewports grandes
+                        { value: 15, label: "15" },
+                        { value: 200, label: "200" },
+                        { value: 250, label: "250" },
+                        ...POWERS.map( a => ( { value: a, label: a.toString() } ))
+                     ]} />
+                  }
+
+                  <NumberInput 
+                  min={15}
+                  max={1000}
+                  size="xl"
+                  suffix=' A'
+                  stepHoldDelay={500}
+                  stepHoldInterval={10}
+                  value={sliderMax}
+                  label={"Máximo"}
+                  onChange={(val) => { setSliderMax(Number(val)) }} />
+               </Flex>
+            </Box>
+
+            <SimpleGrid 
+            h={"60%"}
+            cols={3}>
+               {POWERS.map(a => (
+                  <Button 
+                  size='xl' 
+                  key={a} 
+                  variant={a===sliderMax?'filled':'outline'}
+                  onClick={()=>setSliderMax(a)}
+                  >{a}A</Button>
+               ))}
+            </SimpleGrid>
+
+         </Stack>
       </StepShell>
    );
 };
@@ -108,7 +295,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
       return () => { live = false; };
    }, []);
 
-   const choose = (brandName: string) => {
+   const pick = (brandName: string) => {
       const now = nowIso();
       complete(
          { 
@@ -123,7 +310,7 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
 
    return (
       <StepShell 
-      title="Selecione a marca do equipamento" 
+      title="Identificação" 
       canGoBack={canGoBack} 
       onBack={goBack}>
          {loading ? 
@@ -132,12 +319,26 @@ export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBac
                <Loader />
             </Stack> 
          :
+            <SimpleGrid cols={3}>
+               {brands.map(b => <Button 
+               key={b} 
+               size='xl'
+               variant="filled" 
+               onClick={() => pick(b)}
+               >{b}</Button>)}
+            </SimpleGrid>
+         }
+         {/*
             <ScrollArea h={220}>
                <Group wrap="wrap" gap="xs">
-                  {brands.map(b => <Button key={b} variant="default" onClick={() => choose(b)}>{b}</Button>)}
+                  {brands.map(b => <Button 
+                  key={b} 
+                  variant="default" 
+                  onClick={() => pick(b)}
+                  >{b}</Button>)}
                </Group>
             </ScrollArea>
-         }
+         */ }
       </StepShell>
    );
 };

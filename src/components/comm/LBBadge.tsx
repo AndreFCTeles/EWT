@@ -1,45 +1,43 @@
+import React from "react";
+import { Badge, Tooltip } from "@mantine/core";
+//import useLoadBankLive from "@/hooks/useLBHealth";
+import { useLoadBankRuntime } from "@/hooks/useLoadBankRuntime";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
-import { Button, NumberInput, Title, Text, Badge, SimpleGrid, Flex, ScrollArea, Box } from "@mantine/core";
-import type { LoadBankProbe, LoadBankStatus, SetpointConfig } from "@/types/commTypes";
-import type { StepRuntimeProps } from '@checklist/pipeline';
+//type Props = { portName: string | null; };
 
+const LBBadge: React.FC = () => {//<Props> = ({ portName }) => {
+   //const { status, health, online } = useLoadBankLive(portName);
+   const lb = useLoadBankRuntime();
 
-/*
-type LBBadgeProps = { 
-   hasLoadBank?: string; 
-   bankStatus?: boolean;
-   onBack?: () => void;
-   center?: React.ReactNode; 
-   right?: React.ReactNode; 
-   children: React.ReactNode; 
-}
-*/
-
-const LBBadge: React.FC<StepRuntimeProps> = ( {
-   submission,
-} ) => {
-   const vars = submission.vars ?? {};
-   const loadBank = vars.loadBank as LoadBankProbe | undefined;
-
-   const hasLoadBank = !!(loadBank && loadBank.connected);
-   const portName = loadBank?.connected ? loadBank?.portName ?? "" : "";
-   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(
-      loadBank?.connected ? loadBank?.status ?? null : null
-   );
-   
-      const badge = hasLoadBank && bankStatus ? (
-         <Badge color="green" variant="light">
-            Banca {loadBank!.bank_power}A #{loadBank!.bank_no} · {portName}
-         </Badge>
-      ) : (
-         <Badge color="red" variant="light">
-            Banca offline
-         </Badge>
-      );
-
-      return badge;
-
+   if (lb.phase === "probing") {
+      return <Badge variant="light" color="yellow">A procurar banca…</Badge>;
    }
 
-   export default LBBadge;
+   if (!lb.portName) {
+      return <Badge variant="light" color="red">Banca offline</Badge>;
+   }
+
+   if (!lb.online) {
+      const reason = lb.reason ?? "Trama inválida";
+      return (
+         <Tooltip label={reason}>
+            <Badge variant="light" color="orange">Erro de conexão</Badge>
+         </Tooltip>
+      );
+   }
+
+   // detected + monitoring started, waiting first health/frame
+   if (lb.online === null) {
+      return <Badge variant="light" color="yellow">Banca detetada · a sincronizar…</Badge>;
+   }
+
+   const color = lb.hasErrors ? "yellow" : "green";
+   return (
+      <Badge variant="light" color={color}>
+         Banca {lb.bankPower ?? "?"}A #{lb.bankNo ?? "?"} · {lb.portName}
+         {lb.hasErrors ? " · erro" : ""}
+      </Badge>
+   );
+};
+
+export default LBBadge;

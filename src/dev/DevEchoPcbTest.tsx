@@ -4,8 +4,8 @@ import { Button, Group, NumberInput, Stack, Text, TextInput, Code, Paper } from 
 import { notifications } from "@mantine/notifications";
 
 import { DEV_ECHO_PORT, DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from "@/dev/devConfig";
-import type { Roundtrip } from "@/types/commTypes";
-import { buildLoadBankFrame, findFirstLoadBankFrame } from "@utils/lbProtocol";
+import type { Roundtrip } from "@/types/loadBankTypes";
+import { buildLoadBankFrame, findFirstLoadBankFrame } from "@/services/hw/lbProtocol";
 
 
 
@@ -47,10 +47,10 @@ export default function DevEchoPcbTest() {
 
          // Build a valid LB frame (CRC-correct) so parsing is truly exercised.
          const frame = buildLoadBankFrame({
-            version: 0,
-            bankPower: DEV_ECHO_POWER ?? 4000,
-            bankNo: DEV_ECHO_BANK_NO ?? 1,
-            contactorsMask: 0x1234, // arbitrary mask; echo PCB should mirror bytes unchanged
+            version: 1,
+            bankPower: DEV_ECHO_POWER,
+            bankNo: DEV_ECHO_BANK_NO,
+            contactorsMask: 0x0000, // arbitrary mask; echo PCB should mirror bytes unchanged
             errContactors: 0,
             errFans: 0,
             errThermals: 0,
@@ -103,8 +103,7 @@ export default function DevEchoPcbTest() {
                   label="Porta"
                   value={portName}
                   onChange={(e) => setPortName(e.currentTarget.value)}
-                  placeholder="COM5"
-                  disabled
+                  placeholder="COM4"
                />
                <NumberInput label="Baud" value={baud} onChange={(v) => setBaud(Number(v) || baud)} min={1200} />
                <NumberInput

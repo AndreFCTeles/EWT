@@ -1,15 +1,16 @@
-import { Button, Group, } from '@mantine/core';
+import { Button, Box } from '@mantine/core';
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
 import { nowIso } from '@utils/generalUtils';
+import classes from '@/styles/PPButtons.module.css'
 
 export const ProcedurePickerStep: React.FC<StepRuntimeProps> = ( { 
    id, 
    isActive, 
    canGoBack, 
    goBack, 
-   complete }
-) => {
+   complete 
+} ) => {
    if (!isActive) return;
    const pick = (mode: 'validation' | 'calibration') =>
       complete(
@@ -25,15 +26,21 @@ export const ProcedurePickerStep: React.FC<StepRuntimeProps> = ( {
       );
 
    return (
-      <StepShell /*title="Choose procedure"*/ onBack={goBack} canGoBack={canGoBack}>
-         {/*<Title order={3}>Procedure</Title>*/}
-         {/*<Text c="dimmed" mb="sm">What are we doing this session?</Text>*/}
-         <Group>
-            <Button onClick={() => pick('validation')}>TFL - Validações</Button>
-            <Button onClick={() => pick('calibration')}>Calibrações</Button>
-         </Group>
+      <StepShell title="Operação" onBack={goBack} canGoBack={canGoBack}>
+         <Box className={classes.PPRoot}>
+            <Button 
+            className={classes.PPBtn} 
+            onClick={() => pick('validation')}
+            >Validações</Button>
+            <Button 
+            className={classes.PPBtn} 
+            onClick={() => pick('calibration')}
+            >Calibrações</Button>
+            <Button 
+            className={classes.PPBtn} 
+            variant='outline'
+            >Fim de linha</Button>
+         </Box>
       </StepShell>
    );
 };
-{/*
-         */}

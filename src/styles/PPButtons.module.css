@@ -1,0 +1,81 @@
+/* SCROLL AREA */
+.PPScrollArea :global(.mantine-ScrollArea-viewport),
+.PPScrollArea :global(.mantine-ScrollArea-viewportInner) {
+   height: 100%;
+}
+
+:global(.mantine-ScrollArea-viewport):has(.PPRoot) {
+   height: 100%;
+}
+
+:global(.mantine-ScrollArea-viewportInner):has(.PPRoot) {
+   height: 100%;
+}
+
+:global(.mantine-ScrollArea-content):has(.PPRoot) {
+   height: 100%;
+}
+
+/* BUTTONS */
+.PPRoot {
+   height: 100%;
+   width: 100%;
+   display: grid;
+   /*grid-template-rows: repeat(3, minmax(0, 1fr));*/
+   gap: var(--mantine-spacing-lg);
+}
+
+.PPBtn {
+   width: 100%;
+   height: 100%;
+   border-radius: 0;
+}
+
+.PPRoot :global(.mantine-Button-root) {
+   height: 100% !important;
+   min-height: 0 !important;
+
+   /* override Mantine's sizing variable too */
+   --button-height: 100% !important;
+
+   /* optional: make sure it stretches to the grid cell */
+   align-self: stretch;
+   width: 100%;
+   font-size: xx-large;
+}
+
+
+/* SWITCHES */
+.track {
+   transition:
+      background-color 200ms ease,
+      border-color 200ms ease;
+
+
+   input:checked+& {
+      background-color: var(--mantine-color-blue-9);
+      border-color: var(--mantine-color-blue-9);
+
+      &>.thumb {
+         /*background-color: var(--mantine-color-black);*/
+
+         &::before {
+            background-color: var(--mantine-color-blue-9);
+         }
+      }
+   }
+
+   input+& {
+      background-color: var(--mantine-color-blue-9);
+      border-color: var(--mantine-color-blue-9);
+
+      &>.thumb {
+         /*background-color: var(--mantine-color-black);*/
+
+         &::before {
+            background-color: var(--mantine-color-blue-9);
+         }
+      }
+   }
+
+}

@@ -10,7 +10,7 @@ import {
 } from '@utils/measurement';
 import { getSpecForDut } from '@utils/specsRepo';
 import { nowIso } from '@utils/generalUtils';
-import { signals } from '@utils/hardware'; 
+import { signals } from '@/services/hw/hardware'; 
 import { judge } from '@utils/verdict';
 
 import type { Polarity, Verdict } from '@/types/checklistTypes';

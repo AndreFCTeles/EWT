@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Table, Button, Group, Code } from '@mantine/core';
+import { Table, Button, Group, Code, Box } from '@mantine/core';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
@@ -89,10 +89,12 @@ export const ExportStep: React.FC<StepRuntimeProps> = ( {
       title="Exportação"
       canGoBack={canGoBack} 
       onBack={goBack}>
-         <Code block style={{ maxHeight: 300, overflow: 'auto' }}>{json}</Code>
-         <Group mt="md">
-            <Button onClick={download}>Descarregar ficheiro</Button>
-         </Group>
+         <Box h={"100%"}>
+            <Code block style={{ maxHeight: "100%", overflow: 'auto' }}>{json}</Code>
+            <Box mt="md">
+               <Button onClick={download}>Descarregar ficheiro</Button>
+            </Box>
+         </Box>
       </StepShell>
    );
 };

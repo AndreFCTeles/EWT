@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { CRC8_TABLE, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/commTypes";
-import type { LoadBankFrame, LoadBankStatus, LoadBankHealth } from "@/types/commTypes";
+import { CRC8_TABLE, LB_FRAME_LEN, LB_START, LB_STOP } from "@/types/loadBankTypes";
+import type { LoadBankFrame, LoadBankStatus, LoadBankHealth } from "@/types/loadBankTypes";//, LoadBankFrameDev
 import { 
    DEV_ECHO_BAUD, 
    DEV_ECHO_DELAY, 
@@ -23,28 +23,23 @@ function crc8LoadBank(frame: Uint8Array): number {
    return crc;
 }
 
-// encode/decode helpers based on "(0x0000-0xFFFF) + 0x02" rule in the sheet.
-// You may tweak these once you've confirmed behavior with the real HW.
+// encode/decode helpers based on "(0x0000-0xFFFF) + 0x02" rule
 function encodeU8(raw: number): number {
-   if (raw < 0 || raw > 0xfd) throw new Error("raw U8 out of allowed range (0x00–0xFD)");
-   return (raw + 0x02) & 0xff;
+   if (raw < 0 || raw > 0x7f) throw new Error("raw U8 out of allowed range (0x00–0xFD)");
+   return (raw + 0x02) & 0x7f;
 }
 function decodeU8(encoded: number): number {
-   return (encoded - 0x02) & 0xff;
+   return (encoded - 0x02) & 0x7f;
 }
 function encodeU16(raw: number): [number, number] {
-   if (raw < 0 || raw > 0xfffd) throw new Error("raw U16 out of allowed range (0x0000–0xFFFD)");
-   const val = (raw + 0x0002) & 0xffff;
-   return [ (val >> 8) & 0xff, val & 0xff ];
+   if (raw < 0 || raw > 0x7f7f) throw new Error("raw U16 out of allowed range (0x0000–0xFFFD)");
+   const val = (raw + 0x0202) & 0x7f7f; //const val = (raw + 0x0002) & 0xffff;
+   return [ (val >> 8) & 0x7f, val & 0x7f ];
 }
 function decodeU16(hi: number, lo: number): number {
-   const encoded = ((hi << 8) | lo) & 0xffff;
-   return (encoded - 0x0002) & 0xffff;
+   const encoded = ((hi << 8) | lo) & 0x7f7f;
+   return (encoded - 0x0202) & 0x7f7f; //return (encoded - 0x0002) & 0xffff;
 }
-
-
-
-
 //const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 
@@ -78,19 +73,47 @@ export function parseLoadBankFrame(buf: Uint8Array): LoadBankFrame | null {
       otherErrors,
    };
 }
+/*
+export function parseLoadBankFrameDev(buf: Uint8Array): LoadBankFrameDev | null {
+   if (buf.length !== LB_FRAME_LEN) return null;
+   if (buf[0] !== LB_START || buf[15] !== LB_STOP) return null;
 
+   const crc = crc8LoadBank(buf);
+   if (buf[14] !== crc) return null;
 
-export type buildLoadBankFrameProps = {
-   version: number;
-   bankPower: number;
-   bankNo: number;
-   contactorsMask: number;
-   errContactors?: number;
-   errFans?: number;
-   errThermals?: number;
-   otherErrors?: number;
+   const version = decodeU8(buf[1]);
+   const bankPowerA = decodeU8(buf[2]);
+   const bankPowerB = decodeU8(buf[3]);
+   const bankNo = decodeU8(buf[4]);
+   const contactorsMaskA = decodeU8(buf[5]);
+   const contactorsMaskB = decodeU8(buf[6]);
+   const errContactorsA = decodeU8(buf[7]);
+   const errContactorsB = decodeU8(buf[8]);
+   const errFansA = decodeU8(buf[9]);
+   const errFansB = decodeU8(buf[10]);
+   const errThermalsA = decodeU8(buf[11]);
+   const errThermalsB = decodeU8(buf[12]);
+   const otherErrors = decodeU8(buf[13]);
+
+   return {
+      version,
+      bankPowerA,
+      bankPowerB,
+      bankNo,
+      contactorsMaskA,
+      contactorsMaskB,
+      errContactorsA,
+      errContactorsB,
+      errFansA,
+      errFansB,
+      errThermalsA,
+      errThermalsB,
+      otherErrors,
+   };
 }
-export function buildLoadBankFrame(input: buildLoadBankFrameProps ): Uint8Array {
+*/
+
+export function buildLoadBankFrame(input: LoadBankFrame ): Uint8Array {
    const frame = new Uint8Array(LB_FRAME_LEN);
 
    frame[0] = LB_START;
@@ -120,6 +143,39 @@ export function buildLoadBankFrame(input: buildLoadBankFrameProps ): Uint8Array 
 
    return frame;
 }
+
+/*
+export function buildLoadBankFrameDev(input: LoadBankFrameDev ): Uint8Array {
+   const frame = new Uint8Array(LB_FRAME_LEN);
+
+   frame[0] = LB_START;
+   frame[1] = encodeU8(input.version);
+
+   frame[2] = encodeU8(input.bankPowerA ?? 0); 
+   frame[3] = encodeU8(input.bankPowerB ?? 0);
+
+   frame[4] = encodeU8(input.bankNo);
+
+   frame[5] = encodeU8(input.contactorsMaskA ?? 0); 
+   frame[6] = encodeU8(input.contactorsMaskB ?? 0);
+
+   frame[7] = encodeU8(input.errContactorsA ?? 0); 
+   frame[8] = encodeU8(input.errContactorsB ?? 0);
+
+   frame[9] = encodeU8(input.errFansA ?? 0); 
+   frame[10] = encodeU8(input.errFansB ?? 0);
+
+   frame[11] = encodeU8(input.errThermalsA ?? 0);; 
+   frame[12] = encodeU8(input.errThermalsB ?? 0);;
+
+   frame[13] = encodeU8(input.otherErrors ?? 0);
+
+   frame[14] = crc8LoadBank(frame);
+   frame[15] = LB_STOP;
+
+   return frame;
+}
+*/
 
 /**
  * Scan an arbitrary buffer (e.g. from test_roundtrip_bytes.recv_bytes)
@@ -156,8 +212,10 @@ type Session = {
    stopping?: Promise<void>;
 };
 
+// cache
 const sessions = new Map<SessionKey, Session>();
 const lastStatusByPort = new Map<string, LoadBankStatus>();
+const lastHealthByPort = new Map<string, LoadBankHealth>();
 
 function keyOf(portName: string, baud: number): SessionKey {
    return `${portName}:${baud}`;
@@ -166,12 +224,16 @@ function keyOf(portName: string, baud: number): SessionKey {
 export function getLastLoadBankStatus(portName: string): LoadBankStatus | undefined {
    return lastStatusByPort.get(portName);
 }
+export function getLastLoadBankHealth(portName: string): LoadBankHealth | undefined {
+   return lastHealthByPort.get(portName);
+}
 
 export async function startLoadBankPolling(
    portName: string,
    onStatus: (s: LoadBankStatus) => void,
    abortSignal: AbortSignal,
-   baud = DEV_ECHO_BAUD
+   baud: number = DEV_ECHO_BAUD,
+   onHealth?: (h: LoadBankHealth) => void
 ): Promise<() => Promise<void>> {
    const key = keyOf(portName, baud);
    let session = sessions.get(key);
@@ -204,6 +266,7 @@ export async function startLoadBankPolling(
    }
    // register this subscriber
    session.statusCbs.add(onStatus);
+   if (onHealth) session.healthCbs.add(onHealth);
 
    // stop function only removes THIS subscriber; runtime stops when nobody is listening
    const stop = async () => {
@@ -211,6 +274,7 @@ export async function startLoadBankPolling(
       if (!s) return;
 
       s.statusCbs.delete(onStatus);
+      if (onHealth) s.healthCbs.delete(onHealth);
 
       // if still has listeners, keep runtime alive
       if (s.statusCbs.size > 0 || s.healthCbs.size > 0) return;
@@ -218,10 +282,10 @@ export async function startLoadBankPolling(
       // stop once
       if (!s.stopping) {
          s.stopping = (async () => {
-         s.unlistenStatus?.();
-         s.unlistenHealth?.();
-         await invoke("lb_stop_polling").catch(() => {});
-         sessions.delete(key);
+            s.unlistenStatus?.();
+            s.unlistenHealth?.();
+            await invoke("lb_stop_polling").catch(() => {});
+            sessions.delete(key);
          })();
       }
       await s.stopping;

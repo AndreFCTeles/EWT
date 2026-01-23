@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import { delay } from "./generalUtils";
+import { delay } from "@utils/generalUtils";
 import {
    findFirstLoadBankFrame,
    buildLoadBankFrame,
@@ -9,8 +9,8 @@ import {
    getLastLoadBankStatus,
 } from "./lbProtocol";
 
-import type { InterlockState } from "@/types/generalTypes"; // DB_HOST
-import type { Roundtrip, LoadBankProbe, LoadBankStatus } from "@/types/commTypes"; // , LoadBankHealth
+import type { InterlockState } from "@/types/generalTypes"; 
+import type { Roundtrip, LoadBankProbe, LoadBankStatus } from "@/types/loadBankTypes";
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
@@ -18,31 +18,15 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
 
-/*
-function toHex(bytes: number[]): string {
-   return bytes.map(b => b
-      .toString(16)
-      .toUpperCase()
-      .padStart(2, "0")
-   ).join(" ");
-}
-*/
-
-
-
-
-
-
 
 // ───────────────────────────────────────────────────────────────────────────────
-// LoadBank Probe - DEBUG-only
+// LoadBank Probe
 // ───────────────────────────────────────────────────────────────────────────────
 /**
  * Scans all COM ports.
  * Returns Probe { connected, hw_id, serial, portName? }.
- * Runs on startup
  */
-export async function probeConnectedLB(): Promise<LoadBankProbe> {
+export async function detectLoadBank(): Promise<LoadBankProbe> {
    console.log("[LB/HW] Probing load bank...");
 
    // If runtime was running, stop it before debug probing (safe best-effort)
@@ -96,6 +80,17 @@ export async function probeConnectedLB(): Promise<LoadBankProbe> {
 }
 
 
+
+
+
+
+
+
+
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Initialize contactor via frame data 
+// ───────────────────────────────────────────────────────────────────────────────
 export async function setLoadBankContactors(opts: {
    portName: string;
    //baud?: number;
@@ -103,8 +98,8 @@ export async function setLoadBankContactors(opts: {
    contactorsMask: number;     // 16-bit mask, C1..C16
    timeoutMs?: number;
 }): Promise<LoadBankStatus> {
-   //if (!opts.baud) opts.baud = 115200;
-   const { portName, lastStatus, contactorsMask } = opts; //baud
+   //if (!opts.baud) opts.baud = 115200; // optional assertion
+   const { portName, lastStatus, contactorsMask } = opts; // baud, 
    console.log("[LB/HW] setLoadBankContactors", {
       portName,
       lastStatus,
@@ -126,35 +121,6 @@ export async function setLoadBankContactors(opts: {
    });
    console.log("[LB/HW] setLoadBankContactors/buildLoadBankFrame", txFrame);
 
-
-   /*
-   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", {
-      data: Array.from(txFrame),
-      durationMs: DEV_ECHO_DELAY,
-   });
-   
-   console.debug("[LB/HW] Command sent_bytes:", roundtrip.sent_bytes);
-   console.debug("[LB/HW] Command recv_bytes:", roundtrip.recv_bytes);
-
-
-   const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
-   if (!match) {
-      console.error("[LB/HW] No valid reply after setting contactors");
-      throw new Error("Load bank did not respond with a valid frame after contactor command");
-   }
-
-   const parsed = match.parsed;
-   const status: LoadBankStatus = { ...parsed, portName };
-
-   if (status.errContactors || status.errFans || status.errThermals || status.otherErrors) {
-      console.warn("[LB/HW] Load bank reported errors after command", status);
-   } else {
-      console.log("[LB/HW] Load bank status OK after command");
-   }
-
-   return status;
-   */
-
    // write through runtime (NOT debug roundtrip)
    await lbWriteBytes(txFrame);
 
@@ -168,6 +134,54 @@ export async function setLoadBankContactors(opts: {
 }
 
 
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Contactor comms
+// ───────────────────────────────────────────────────────────────────────────────
+/** 
+ * Safely apply a new contactor mask by turning all off, then on. 
+ * */
+export async function applyLoadBankMaskSequence(opts: {
+   portName: string;
+   currentStatus: LoadBankStatus;
+   targetMask: number;
+}): Promise<LoadBankStatus> {
+   const { portName, currentStatus, targetMask } = opts;
+   // turn all contactors OFF
+   const offStatus = await setLoadBankContactors({
+      portName,
+      lastStatus: currentStatus,
+      contactorsMask: 0x0000,
+   });
+   // (Optionally notify UI about offStatus here if needed for immediate feedback)
+   // turn ON contactors for target mask
+   try {
+      const newStatus = await setLoadBankContactors({
+         portName,
+         lastStatus: offStatus,
+         contactorsMask: targetMask,
+      });
+      return newStatus;
+   } catch (err) {
+      console.error("[LoadBank] Failed to apply mask 0x%s on %s: %o", 
+                  targetMask.toString(16), portName, err);
+      // ensure all contactors off if the second step failed
+      try {
+         await setLoadBankContactors({
+            portName,
+            lastStatus: offStatus,
+            contactorsMask: 0x0000,
+            timeoutMs: 1200,
+         });
+      } catch { /* ignore errors in fallback */ }
+      throw err;
+   }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Check LB Status -- DEBUG
+// ───────────────────────────────────────────────────────────────────────────────
 export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_BAUD): Promise<LoadBankStatus | null> {
    await invoke("lb_stop_polling").catch(() => {}); // avoid port fight
 
@@ -177,15 +191,6 @@ export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_B
 
    const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
    if (!match) return null;
-
-   /*
-   const { raw, parsed } = match;
-   return {
-      ...parsed,
-      portName,
-      rawFrameHex: toHex(Array.from(raw)),
-   };
-   */
 
    return { ...match.parsed, portName };
 }
@@ -203,8 +208,6 @@ export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_B
 // ───────────────────────────────────────────────────────────────────────────────
 // Signals bus — interlocks + simple measurements
 // ───────────────────────────────────────────────────────────────────────────────
-
-
 export type Signals = {
    getInterlocks(): Promise<InterlockState>;
    subscribeInterlocks(cb: (s: InterlockState) => void): () => void;
