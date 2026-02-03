@@ -5,7 +5,7 @@ import classes from '@/styles/PPButtons.module.css'
 
 
 
-
+// Resize children automatically to 100% height
 function useElementSize<T extends HTMLElement>() {
    const ref = useRef<T | null>(null);
    const [height, setHeight] = useState(0);
@@ -38,6 +38,10 @@ type SSProps = {
    children: React.ReactNode; 
 }
 
+
+
+
+
 export const StepShell: React.FC<SSProps> = ( { 
    title, 
    canGoBack, 
@@ -69,7 +73,7 @@ export const StepShell: React.FC<SSProps> = ( {
       shadow={"sm"}
       withBorder >
 
-         <Box ref={headerRef}>
+         <Box>{/* ref={headerRef}>*/}
             <SimpleGrid 
             ref={headerRef}
             cols={3}

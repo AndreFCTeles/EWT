@@ -3,9 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button, Group, NumberInput, Stack, Text, TextInput, Code, Paper } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 
-import { DEV_ECHO_PORT, DEV_ECHO_BAUD, DEV_ECHO_DELAY, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from "@/dev/devConfig";
-import type { Roundtrip } from "@/types/loadBankTypes";
-import { buildLoadBankFrame, findFirstLoadBankFrame } from "@/services/hw/lbProtocol";
+import { DEV_ECHO_PORT, DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig"; // , DEV_ECHO_POWER, DEV_ECHO_BANK_NO,
+import { Roundtrip} from "@/types/loadBankTypes";
+import { buildLoadBankFrame_fw,  findFirstLoadBankFrame } from "@/services/hw/lbProtocol"; // buildLoadBankFrameDev,
 
 
 
@@ -18,7 +18,7 @@ function toHex(bytes: number[] | Uint8Array): string {
 
 
 export default function DevEchoPcbTest() {
-   const [portName, setPortName] = useState<string>(DEV_ECHO_PORT ?? "COM5");
+   const [portName, setPortName] = useState<string>(DEV_ECHO_PORT ?? "COM4");
    const [baud, setBaud] = useState<number>(DEV_ECHO_BAUD ?? 115200);
    const [durationMs, setDurationMs] = useState<number>(DEV_ECHO_DELAY ?? 400);
    const [busy, setBusy] = useState(false);
@@ -27,9 +27,14 @@ export default function DevEchoPcbTest() {
    const [rxHex, setRxHex] = useState<string>("");
    const [parsed, setParsed] = useState<any>(null);
 
+
    const runTest = async () => {
       if (!portName) {
-         notifications.show({ color: "red", title: "Porta inválida", message: "Indica uma porta (ex: COM5)." });
+         notifications.show({ 
+            color: "red", 
+            title: "Porta inválida", 
+            message: "Indica uma porta (ex: COM5)." 
+         });
          return;
       }
 
@@ -46,11 +51,11 @@ export default function DevEchoPcbTest() {
          await invoke("connect", { portName, baud });
 
          // Build a valid LB frame (CRC-correct) so parsing is truly exercised.
-         const frame = buildLoadBankFrame({
+         const frame = buildLoadBankFrame_fw({
             version: 1,
-            bankPower: DEV_ECHO_POWER,
-            bankNo: DEV_ECHO_BANK_NO,
-            contactorsMask: 0x0000, // arbitrary mask; echo PCB should mirror bytes unchanged
+            bankPower: 600,
+            bankNo: 1,
+            contactorsMask: 255,
             errContactors: 0,
             errFans: 0,
             errThermals: 0,
@@ -64,15 +69,38 @@ export default function DevEchoPcbTest() {
             data: Array.from(frame),
             durationMs,
          });
+         const res = await invoke<{
+            sent_ascii: string;
+            sent_hex: string;
+            recv_hex: string;
+            recv_ascii: string;
+         }>("test_roundtrip_text", { 
+            payload: "ABC 123\r\n", 
+            text: Array.from(frame),
+            durationMs: durationMs 
+         });
+
+         console.log("Sent ASCII:", res.sent_ascii);
+         console.log("Sent HEX  :", res.sent_hex);
+         console.log("Recv HEX  :", res.recv_hex);
+         console.log("Recv ASCII:", res.recv_ascii);
 
          setRxHex(roundtrip.recv_hex || toHex(roundtrip.recv_bytes));
 
          // Try to parse echoed frame
          const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
          if (!match) {
-            setParsed({ ok: false, message: "No valid LoadBank frame found in echo.", bytes: roundtrip.recv_bytes });
+            setParsed({ 
+               ok: false, 
+               message: "No valid LoadBank frame found in echo.", 
+               bytes: roundtrip.recv_bytes 
+            });
          } else {
-            setParsed({ ok: true, parsed: match.parsed, raw: toHex(match.raw) });
+            setParsed({ 
+               ok: true, 
+               parsed: match.parsed, 
+               raw: toHex(match.raw) 
+            });
          }
 
          notifications.show({

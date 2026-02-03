@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Loader, Stack, Text,Flex, Box, SimpleGrid, RangeSlider, Slider, NumberInput, Switch, Title } from '@mantine/core';
+import { Button, Loader, Stack, Text,Flex, Box, SimpleGrid, RangeSlider, Slider, NumberInput, Switch, Title, Checkbox } from '@mantine/core';
 import { notifications } from "@mantine/notifications";
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
@@ -11,6 +11,7 @@ import { API_URL } from '@/lib/config';
 import { Process} from '@/types/checklistTypes';//, RatedCurrent 
 import { PROCESSES, POWERS } from '@/types/checklistTypes';
 import classes from '@/styles/PPButtons.module.css'
+import { useLoadBankRuntime } from '@/hooks/useLoadBankRuntime';
 
 
    const notify = (msg: string) => {
@@ -36,7 +37,12 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
    complete
 } ) => {
    const [selectedProcess, setSelectedProcess] = useState<Process | undefined>(submission?.vars?.selectedProcess);
-   const [selectedPhase, setSelectedPhase] = useState();
+   const [phaseSwitch, setPhaseSwitch] = useState<boolean>(false);
+   //const [selectedPhase, setSelectedPhase] = useState<"230"|"400">("230");
+
+   
+   console.log("PickProcessStep submission");
+   console.log(submission);
 
    const pick = (p: Process) => {
       complete(
@@ -84,45 +90,125 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
 
             {/* Dyn option selectors */}
             <Box w={"30%"}>
-               <Title order={2} ta={"center"} mb={0} pb={0}>Tensão de Vazio</Title>
+
+               {/*<Title order={2} ta={"center"} mb={0} pb={0}>Tensão de Vazio</Title>
                <Flex
                w={"100%"} 
-               pb={"md"}
-               justify={'space-around'}>
-                  <NumberInput />
-               </Flex>
+               pb={"xl"}
+               justify={'space-around'}>*/}
+                  <NumberInput
+                  mb={"md"}
+                  mx={"sm"}
+                  label="Tensão de Vazio" />
+               {/*</Flex>*/}
 
-               <Title order={2} ta={"center"} mb={0} pb={0}>{
+               {/*<Title order={2} ta={"center"} mb={0} pb={0}>{
                   selectedProcess === 'MIGInv' 
                   ? 'Tensão'
                   : 'Corrente'
                } de Controlo</Title>
                <Flex
                w={"100%"} 
-               pb={"md"}
-               justify={'space-around'}>
-                  <NumberInput />
-               </Flex>
+               pb={"xl"}
+               justify={'space-around'}>*/}
 
-               <Title order={2} ta={"center"} mb={0} pb={0}>Tensão de alimentação</Title>
-               <Flex
+                  <NumberInput
+                  mb={"md"}
+                  mx={"sm"}
+                  label={`${
+                     selectedProcess === 'MIGInv' 
+                     ? 'Tensão'
+                     : 'Corrente'
+                  } de Controlo
+                  `} />
+               {/*</Flex>*/}
+
+               <Text ta={"center"} mb={0} pb={0}>Tensão de alimentação</Text>
+
+               {/*<SimpleGrid
                w={"100%"} 
+               pt={0}
                pb={"md"}
-               justify={'center'}
-               align={'center'}>
-                  <Stack align='flex-end' p={0} gap={0}>
-                     <Text m={0} p={0}>230V AC</Text>
-                     <Text m={0} p={0} fw={600} size={"sm"} c={"dimmed"}>(monofásica)</Text>
+               cols={3}
+               spacing={0}>
+                  <Stack 
+                  align='flex-end' 
+                  p={0} my={'auto'}
+                  ml={'auto'} mr={0} 
+                  gap={0}>
+                     <Text
+                     size={"xl"} 
+                     c={!phaseSwitch?"":"dimmed"}  
+                     m={0} p={0}
+                     >230V AC</Text>
+                     <Text 
+                     m={0} p={0} 
+                     fw={600} 
+                     size={"sm"} 
+                     c={"dimmed"}>(monofásica)</Text>
+                  </Stack>*/}
+
+                  <Flex mb={"md"}>
+                     <Switch 
+                     classNames={classes} 
+                     checked={phaseSwitch}
+                     onChange={(event) => setPhaseSwitch(event.currentTarget.checked)}
+                     m={"auto"}
+                     size={'xl'}
+                     radius={"sm"}
+                     onLabel={ <Stack gap={0} >
+                        <Text
+                        m={0} p={0}
+                        >400V AC</Text>
+                        <Text 
+                        m={0} p={0} 
+                        fw={600} 
+                        size={"sm"} 
+                        c={"#adb5bd"}
+                        >(trifásica)</Text>
+                     </Stack> }
+                     offLabel={ <Stack gap={0} w={"100% "} m={"auto"} >
+                        <Text 
+                        m={0} p={0}
+                        c={"bright"}
+                        >230V AC</Text>
+                        <Text 
+                        m={0} p={0} 
+                        fw={600} 
+                        size={"sm"} 
+                        c={"#adb5bd"}
+                        >(monofásica)</Text>
+                     </Stack> } />
+                  </Flex>
+
+                  {/*<Stack 
+                  align='flex-start'
+                  p={0} my={'auto'}
+                  mr={'auto'} ml={0} 
+                  gap={0}>
+                     <Text
+                     size={"xl"} 
+                     c={phaseSwitch?"":"dimmed"} 
+                     m={0} p={0}
+                     >400V AC</Text>
+                     <Text 
+                     m={0} p={0} 
+                     fw={600} 
+                     size={"sm"} 
+                     c={"dimmed"}>(trifásica)</Text>
                   </Stack>
-                  <Switch 
-                  classNames={classes} 
-                  mx={"xs"}
-                  size={'xl'}
-                  radius={"sm"}
-                  />
-                  <Stack align='flex-start' p={0} gap={0}>
-                     <Text m={0} p={0}>400V AC</Text>
-                     <Text m={0} p={0} fw={600} size={"sm"} c={"dimmed"}>(trifásica)</Text>
+               </SimpleGrid>*/}
+
+
+               <Flex w={"100%"} mt={"sm"}>
+                  <Stack w={"60%"} mx="auto">
+                     <Checkbox
+                     size="md"
+                     style={{ cursor: 'pointer', justifyItems: 'center', alignitems:'center' }}
+                     label="Permite leitura de tensão em tempo real" />
+                     <Checkbox
+                     size="md"
+                     label="Permite leitura de corrente em tempo real" />
                   </Stack>
                </Flex>
             </Box>
@@ -145,6 +231,8 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
    complete 
 } ) => {
    // min max inits
+   const lb = useLoadBankRuntime();
+   const powers = lb.bankPower ? POWERS.filter((p) => p > lb!.bankPower!) : POWERS; 
    const process = submission?.vars?.selectedProcess;
    const minPowerVar = submission?.vars?.minPowerA ? submission.vars.minPowerA : 15
    const powerVar = submission?.vars?.powerA ? submission.vars.powerA : 600
@@ -152,13 +240,18 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
    const [sliderMax, setSliderMax] = useState<number>(powerVar);
    const [sliderRange, setSliderRange] = useState<[number,number]>([sliderMin,sliderMax]);
    // min max updates
-   useEffect(()=>{
+   useEffect(()=>{ // min/max changes update ranges
       setSliderRange([sliderMin,sliderMax]);
-   }, [sliderMin, sliderMax])
-   useEffect(()=>{
+   }, [sliderMin, sliderMax]);
+   useEffect(()=>{ // range changes update max min
       setSliderMin(sliderRange[0]);
       setSliderMax(sliderRange[1]);
-   }, [sliderRange])
+   }, [sliderRange]);
+
+
+
+   console.log("PickPowerStep submission");
+   console.log(submission);
 
    
    // NEXT
@@ -218,9 +311,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
                      value={sliderMax}
                      onChange={setSliderMax}
                      marks={[ // talvez usar marcas dinamicas apenas em viewports grandes
-                        { value: 200, label: "200" },
-                        { value: 250, label: "250" },
-                        ...POWERS.map( a => ( { value: a, label: a.toString() } ))
+                        ...powers.map( a => ( { value: a, label: a.toString() } ))
                      ]} />
                   :
                      <RangeSlider 
@@ -236,9 +327,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
                      onChange={setSliderRange}
                      marks={[ //talvez usar marcas dinamicas apenas em viewports grandes
                         { value: 15, label: "15" },
-                        { value: 200, label: "200" },
-                        { value: 250, label: "250" },
-                        ...POWERS.map( a => ( { value: a, label: a.toString() } ))
+                        ...powers.map( a => ({ value: a, label: a.toString() }) )
                      ]} />
                   }
 
@@ -258,7 +347,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
             <SimpleGrid 
             h={"60%"}
             cols={3}>
-               {POWERS.map(a => (
+               {powers.map(a => (
                   <Button 
                   size='xl' 
                   key={a} 
@@ -279,9 +368,15 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
 
 
 // ---- PickBrand ----
-export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete }) => {
+export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete, submission }) => {
    const [brands, setBrands] = useState<string[]>([]);
    const [loading, setLoading] = useState(true);
+
+
+   
+   console.log("PickBrandStep submission");
+   console.log(submission);
+
 
    useEffect(() => {
       let live = true;

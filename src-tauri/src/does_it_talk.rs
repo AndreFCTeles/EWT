@@ -56,11 +56,11 @@ pub fn close(state: State<SerialState>) {
 #[tauri::command]
 pub fn test_roundtrip_text(
     state: State<SerialState>,
-    text: String,
+    text: Vec<u8>,
     duration_ms: Option<u64>,
 ) -> Result<Roundtrip, String> {
-    let bytes = text.into_bytes();
-    test_roundtrip_bytes(state, bytes, duration_ms)
+    //let bytes = text.into_bytes();
+    test_roundtrip_bytes(state, text, duration_ms)
 }
 
 // Send raw BYTES and listen

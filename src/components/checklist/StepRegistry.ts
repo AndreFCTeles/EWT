@@ -29,12 +29,12 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    detectPowerBank:/*-------*/DetectLBStep, //auto
    pickProcedure:/*---------*/ProcedurePickerStep,
 
-   dutSearch:/*-------------*/SkipStep, //DutSearchStep,
+   //dutSearch:/*-------------*/SkipStep, //DutSearchStep,
 
    pickProcess:/*-----------*/PickProcessStep,
    pickPower:/*-------------*/PickPowerStep,
    pickBrand:/*-------------*/PickBrandStep,
-   dut:/*-------------------*/DutInfoStep, //DutInfoStep, // nome dut, form com specs principais //caso falhe identificações anteriores
+   //dut:/*-------------------*/DutInfoStep, //DutInfoStep, // nome dut, form com specs principais //caso falhe identificações anteriores
 
    specs:/*-----------------*/SkipStep,
 

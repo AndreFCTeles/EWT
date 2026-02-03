@@ -73,11 +73,9 @@ export type LoadBankFrame = {
    errThermals: number;
    otherErrors: number;    // EV/EI/etc as bitfield
 };
-/*
 export type LoadBankFrameDev = {
    version: number;
-   bankPowerA: number;
-   bankPowerB: number;
+   bankPower: number;
    bankNo: number;
    contactorsMaskA: number;
    contactorsMaskB: number;
@@ -89,7 +87,6 @@ export type LoadBankFrameDev = {
    errThermalsB: number;
    otherErrors: number;
 };
-*/
 export type LoadBankStatus = LoadBankFrame & {
    portName: string;
    rawFrameHex?: string;

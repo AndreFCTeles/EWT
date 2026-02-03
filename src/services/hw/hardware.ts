@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { delay } from "@utils/generalUtils";
 import {
    findFirstLoadBankFrame,
-   buildLoadBankFrame,
+   buildLoadBankFrame_7f,
    lbWriteBytes,
    waitForLoadBankMask,
    getLastLoadBankStatus,
@@ -107,7 +107,7 @@ export async function setLoadBankContactors(opts: {
    });
 
    // Build a frame using the last known meta-fields
-   const txFrame = buildLoadBankFrame({
+   const txFrame = buildLoadBankFrame_7f({
       version: lastStatus.version,
       bankPower: lastStatus.bankPower,
       bankNo: lastStatus.bankNo,

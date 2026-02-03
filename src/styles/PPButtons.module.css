@@ -46,10 +46,32 @@
 
 
 /* SWITCHES */
+.thumb {
+   padding: 10% 5% 10% 5%;
+}
+
+.thumb:hover,
+.track:hover {
+   transition:
+      background-color 200ms ease;
+}
+
+.thumb:hover {
+   background-color: var(--mantine-color-gray-3);
+}
+
+.track:hover {
+   background-color: var(--mantine-color-blue-7);
+}
+
 .track {
    transition:
       background-color 200ms ease,
       border-color 200ms ease;
+   width: 180px;
+   height: 100px;
+   padding: 15% 20% 15% 20%;
+
 
 
    input:checked+& {
@@ -77,5 +99,8 @@
          }
       }
    }
+}
 
+label {
+   line-height: normal;
 }

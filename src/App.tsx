@@ -19,7 +19,8 @@ import {
    useComputedColorScheme,
    Menu,
    Box,
-   Drawer
+   Drawer,
+   Stepper
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
@@ -108,6 +109,10 @@ const App: React.FC  = () => {
    */
    // DayJS
    const date = dayjs().format('DD/MM/YYYY');
+
+   const [active, setActive] = useState(1);
+   const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
+   const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
 
 
 
@@ -354,6 +359,7 @@ const App: React.FC  = () => {
                      }>Terminar sessão</Menu.Item>
                   </Menu.Dropdown>
                </Menu>
+
 
                <Flex direction={"column"} justify="center" gap={0} align={"center"} h={"100%"} mr={'xl'} >
                   <Text lh={1} fw={300} p={0} m={0} className='dt'><Clock /></Text>
