@@ -84,6 +84,7 @@
 
 /* ---------------- ScrollArea / Button height adjust ---------------- */
 /* SCROLL AREA */
+/*
 .PPScrollArea :global(.mantine-ScrollArea-viewport),
 .PPScrollArea :global(.mantine-ScrollArea-viewportInner) {
    height: 100%;
@@ -100,8 +101,10 @@
 :global(.mantine-ScrollArea-content):has(.PPRoot) {
    height: 100%;
 }
+   */
 
 /* BUTTONS */
+/*
 .PPRoot {
    height: 100%;
    width: 100%;
@@ -120,11 +123,13 @@
    height: 100% !important;
    min-height: 0 !important;
 
-   /* override Mantine's sizing variable too */
+
    --button-height: 100% !important;
 
-   /* optional: make sure it stretches to the grid cell */
+
    align-self: stretch;
    width: 100%;
    font-size: xx-large;
 }
+
+*/

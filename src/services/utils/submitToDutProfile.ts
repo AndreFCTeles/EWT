@@ -1,7 +1,7 @@
 import type { Submission } from '@/types/checklistTypes';
 import type { DutProfile } from '@/types/dutProfileTypes';
 import { saveDutProfile } from '@/services/api/dut/dutProfilesRepo';
-import { nowIso } from './generalUtils';
+import { nowIso } from '../src/services/utils/generalUtils';
 
 export function submissionToDutProfile(s: Submission): DutProfile | null {
    const d = s.dut;

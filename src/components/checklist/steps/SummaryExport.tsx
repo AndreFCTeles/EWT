@@ -8,13 +8,13 @@ import { buildReport } from '@utils/report';
 
 
 export const SummaryStep: React.FC<StepRuntimeProps> = ( { 
-   id, 
-   alreadyCompleted, 
+   //id, 
+   //alreadyCompleted, 
    canGoBack, 
    goBack, 
-   isActive, 
+   //isActive, 
    complete, 
-   abort,
+   //abort,
    submission 
 } ) => {//, id 
    const rows = submission.steps.map(s => (
@@ -55,13 +55,13 @@ export const SummaryStep: React.FC<StepRuntimeProps> = ( {
 };
 
 export const ExportStep: React.FC<StepRuntimeProps> = ( { 
-   id, 
-   alreadyCompleted, 
+  // id, 
+  // alreadyCompleted, 
    canGoBack, 
    goBack, 
-   isActive, 
-   complete, 
-   abort,
+  // isActive, 
+  // complete, 
+  // abort,
    submission 
 } ) => {
    const report = useMemo(() => buildReport(submission), [submission]);

@@ -27,14 +27,16 @@ export type StepId =
    | 'specs' //| 'dutSearch'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
    //| 'dut' 
-   | 'interlocks' | 'connections' | 'selftests' | 'calstatus'
+   //| 'interlocks' | 'connections' | 'selftests' | 'calstatus'
    | 'calibration' | 'ocv'
+   /*
    | `proc:${Process}:nominals`
    | `proc:${Process}:start`
    | `proc:${Process}:sweep`
    | `proc:${Process}:thermal`
    | `proc:${'MIGInv' | 'TIG'}:pulse`
    | `proc:${'MIGInv' | 'TIG'}:gas`
+   */
    | 'summary' | 'export';
 
 export const PIPELINE: StepId[] = [ // ordem
@@ -42,11 +44,13 @@ export const PIPELINE: StepId[] = [ // ordem
    'specs', // 'dutSearch',
    'pickProcess', 'pickPower', 'pickBrand',
    //'dut', 
-   'interlocks', 'connections', 'selftests', 'calstatus',
+   //'interlocks', 'connections', 'selftests', 'calstatus',
    'calibration','ocv',
+   /*
    'proc:MIGInv:nominals', 'proc:MIGInv:start', 'proc:MIGInv:sweep', 'proc:MIGInv:pulse', 'proc:MIGInv:thermal', 'proc:MIGInv:gas',
    'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
    'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',
+   */
    'summary', 'export'
 ];
 

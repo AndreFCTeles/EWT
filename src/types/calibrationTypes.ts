@@ -70,7 +70,7 @@ export type DutProfile = {
    productId?: string;
    productSnapshot?: ProductData;
 
-   /*
+   
    // Human ID
    brand: string;
    prodName: string;
@@ -81,7 +81,7 @@ export type DutProfile = {
    categorySub?: string;                                 // 'maq-mig', 'maq-tig', 'maq-mma', ...
    categorySubSub?: string;                              // 'maq-mig-bas', etc.
    format?: string;                                      // 'maq-mig-f-com', 'maq-mig-f-mod', ...
-   */
+   
 
    // Useful derived fields
    key: string;                                          // brand::prodName::series::catPath

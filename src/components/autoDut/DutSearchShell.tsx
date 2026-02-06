@@ -6,18 +6,19 @@ import { DutGrid } from '@/components/autoDut/DutGrid';
 import { nowIso } from '@utils/generalUtils';
 import { productToDutFromProfile } from '@utils/dutMapping';
 import { StepShell } from '../checklist/StepShell';
-import { DutProfile } from '@/types/dutProfileTypes';
+//import { DutProfile } from '@/types/calibrationTypes';
 
 const DutSearchInner: React.FC<StepRuntimeProps> = ({
-   id,
+  // id,
    //role,
    canGoBack,
    goBack,
-   apply,      // does NOT navigate
-   complete,   // persists + navigates
+   //apply,      // does NOT navigate
+  // complete,   // persists + navigates
 }) => {
    const { filter, setFilter } = useDutSearch();
 
+   /*
    const onSelectProfile = (p: DutProfile) => {
       const when = nowIso();
       const dut = productToDutFromProfile(p);
@@ -49,6 +50,7 @@ const DutSearchInner: React.FC<StepRuntimeProps> = ({
          }, {} // nothing extra, we already applied dut & profile on select
       );
    };
+   */
 
    return (
       <StepShell

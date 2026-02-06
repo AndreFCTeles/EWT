@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Loader, Stack, Text,Flex, Box, SimpleGrid, RangeSlider, Slider, NumberInput, Switch, Title, Checkbox } from '@mantine/core';
+import { Button, Loader, Stack, Text,Flex, Box, SimpleGrid, RangeSlider, Slider, NumberInput, Switch, Checkbox } from '@mantine/core';
 import { notifications } from "@mantine/notifications";
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
@@ -204,7 +204,6 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
                   <Stack w={"60%"} mx="auto">
                      <Checkbox
                      size="md"
-                     style={{ cursor: 'pointer', justifyItems: 'center', alignitems:'center' }}
                      label="Permite leitura de tensão em tempo real" />
                      <Checkbox
                      size="md"

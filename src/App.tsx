@@ -20,7 +20,7 @@ import {
    Menu,
    Box,
    Drawer,
-   Stepper
+   //Stepper
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { 
@@ -110,9 +110,9 @@ const App: React.FC  = () => {
    // DayJS
    const date = dayjs().format('DD/MM/YYYY');
 
-   const [active, setActive] = useState(1);
-   const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
-   const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
+   //const [active, setActive] = useState(1);
+   //const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
+   //const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
 
 
 

@@ -23,7 +23,7 @@ export function getCategoryPath(cat?: ProdCategory): string[] {
 export function deriveProcesses(cat?: ProdCategory): Process[] {
    const vals = getCategoryPath(cat).map(v => v.toLowerCase());
    const hits = new Set<Process>();
-   if (vals.some(v => v.includes('maq-mig'))) hits.add('MIG');
+   if (vals.some(v => v.includes('maq-mig'))) hits.add('MIGInv');
    if (vals.some(v => v.includes('maq-tig'))) hits.add('TIG');
    if (vals.some(v => v.includes('maq-mma'))) hits.add('MMA');
    return [...hits];

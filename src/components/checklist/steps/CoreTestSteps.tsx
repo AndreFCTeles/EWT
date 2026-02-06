@@ -147,7 +147,7 @@ export const InterlocksStep: React.FC<StepRuntimeProps> = ( {
 // ---------- Connections ----------
 export const ConnectionsStep: React.FC<StepRuntimeProps> = ( { 
    id, 
-   alreadyCompleted, 
+   //alreadyCompleted, 
    role, 
    canGoBack, 
    goBack, 
@@ -223,12 +223,12 @@ export const ConnectionsStep: React.FC<StepRuntimeProps> = ( {
 // ---------- OCV ----------
 export const OcvStep: React.FC<StepRuntimeProps> = ( { 
    id, 
-   alreadyCompleted, 
+   //alreadyCompleted, 
    canGoBack, 
    goBack, 
    isActive, 
    complete, 
-   abort,
+   //abort,
    submission 
 } ) => {
    const [reading, setReading] = useState<number | null>(null);
