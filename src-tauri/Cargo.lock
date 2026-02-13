@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "calamine",
  "chrono",
+ "encoding_rs",
  "regex",
  "reqwest",
  "rust_xlsxwriter",

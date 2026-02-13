@@ -8,7 +8,7 @@ export const DEV_STUB_CONNECTED = true;
 export const DEV_STUB_DB_MATCH = true;
 
 export const DEV_ECHO_ENABLED = true; 
-export const DEV_ECHO_PORT = "COM4";
+export const DEV_ECHO_PORT = "COM6";
 export const DEV_ECHO_POWER = 600;
 export const DEV_ECHO_DEBUG_BANK = true;
 export const DEV_ECHO_BANK_NO = 1;

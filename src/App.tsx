@@ -60,8 +60,8 @@ const App: React.FC  = () => {
 
    /* |--- STATES ---| */
    // Autenticação e níveis de acesso
-   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------- Mostra modal de login
-   const [isLoggedIn, setIsLoggedIn] = useState(true); // -------------------------------------- Ativa/muda elementos UI após login
+   const [showLoginModal, setShowLoginModal] = useState(false); // ------------------------------ Mostra modal de login
+   const [isLoggedIn, setIsLoggedIn] = useState(true); // --------------------------------------- Ativa/muda elementos UI após login
    const [authUser, setAuthUser] = useState<CredentialSafe>(); // ------------------------------- Muda acesso a funcionalidades consoante autorização de login
    const [role, setRole] = useState<Role>('admin');//('admin');
 // const roleRank: Record<Role, number> = { user: 0, admin: 1, superadmin: 2 }; // -------------- Nível de acesso
@@ -84,35 +84,8 @@ const App: React.FC  = () => {
    const [uiView, setUiView] = useState<UIVIEW>('basic');
    const [calViewerOpen, setCalViewerOpen] = useState(false);
    const [calViewerToolCode, setCalViewerInstrumentCode] = useState<string | null>(null);
-   // Sistema de Notificações
-   /*
-   const [notification, setNotification] = useState<{
-      visible: boolean;
-      title: string;
-      message: string | React.ReactNode;
-      color: string;
-   }>({
-      visible: false,
-      title: '',
-      message: '',
-      color: 'green',
-   });
-   const showNotification = useCallback((title: string, message: string | React.ReactNode, color: string) => {
-      setNotification({
-         visible: true,
-         title,
-         message,
-         color,
-      });
-      setTimeout(() => { setNotification((prevState) => ({ ...prevState, visible: false })); }, 5000);
-   }, []);
-   */
    // DayJS
    const date = dayjs().format('DD/MM/YYYY');
-
-   //const [active, setActive] = useState(1);
-   //const nextStep = () => setActive((current) => (current < 3 ? current + 1 : current));
-   //const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
 
 
 

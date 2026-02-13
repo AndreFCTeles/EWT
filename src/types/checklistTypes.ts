@@ -23,7 +23,9 @@ export type Verdict =
 
 // STEPS
 export type StepId =
-   'detectPowerBank' | 'pickProcedure' 
+   'detectPowerBank'
+   | 'testLBStep' 
+   | 'pickProcedure' 
    | 'specs' //| 'dutSearch'
    | 'pickProcess' | 'pickPower' | 'pickBrand'
    //| 'dut' 
@@ -40,7 +42,9 @@ export type StepId =
    | 'summary' | 'export';
 
 export const PIPELINE: StepId[] = [ // ordem
-   'detectPowerBank', 'pickProcedure',
+   'detectPowerBank', 
+   'testLBStep',
+   'pickProcedure',
    'specs', // 'dutSearch',
    'pickProcess', 'pickPower', 'pickBrand',
    //'dut', 

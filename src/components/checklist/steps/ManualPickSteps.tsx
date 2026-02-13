@@ -155,25 +155,22 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
                      onChange={(event) => setPhaseSwitch(event.currentTarget.checked)}
                      m={"auto"}
                      size={'xl'}
-                     radius={"sm"}
-                     onLabel={ <Stack gap={0} >
+                     onLabel={ <Stack gap={0} 
+                        mr={0} pr={0}>
                         <Text
-                        m={0} p={0}
+                        c={"#ffffff"}
                         >400V AC</Text>
                         <Text 
-                        m={0} p={0} 
                         fw={600} 
                         size={"sm"} 
                         c={"#adb5bd"}
                         >(trifásica)</Text>
                      </Stack> }
-                     offLabel={ <Stack gap={0} w={"100% "} m={"auto"} >
+                     offLabel={ <Stack gap={0} >
                         <Text 
-                        m={0} p={0}
-                        c={"bright"}
+                        c={"#ffffff"}
                         >230V AC</Text>
                         <Text 
-                        m={0} p={0} 
                         fw={600} 
                         size={"sm"} 
                         c={"#adb5bd"}
@@ -212,6 +209,7 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
                </Flex>
             </Box>
          </Flex>
+
       </StepShell>
    );
 };

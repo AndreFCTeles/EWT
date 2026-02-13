@@ -4,9 +4,9 @@ import { Unit } from "./checklistTypes";
 /* ──────────────────────────────────────────────────────────────────────────────
    Load bank protocol constants
 ────────────────────────────────────────────────────────────────────────────── */
-export const LB_FRAME_LEN = 16;
-export const LB_START = 0x01;
-export const LB_STOP = 0x00;
+export const LB_FRAME_LEN = 14;
+//export const LB_START = 0x01;
+//export const LB_STOP = 0x00;
 
 // ------ CRC ------
 export const CRC8_TABLE: number[] = [
@@ -39,8 +39,12 @@ export type Roundtrip = {
    recv_bytes: number[];
    sent_hex: string;
    recv_hex: string;
+   sent_hex_dump: string;
+   recv_hex_dump: string;
    sent_ascii: string;
    recv_ascii: string;
+   sent_encoded_msg: string;
+   recv_encoded_msg: string;
 };
 export type Probe = {
    connected: boolean;
@@ -63,19 +67,22 @@ export type LoadBankHealth = {
    lastSeenMs: number;
    reason?: string | null;
 };
+
 export type LoadBankFrame = {
-   version: number;        // decoded
-   bankPower: number;      // decoded
-   bankNo: number;         // decoded
-   contactorsMask: number; // 16 bits C1..C16
+   version: number;  
+   bankPower: number;   
+   bankNo: number;     
+   contactorsMask: number; 
    errContactors: number;
    errFans: number;
    errThermals: number;
-   otherErrors: number;    // EV/EI/etc as bitfield
+   otherErrors: number;   
 };
+
 export type LoadBankFrameDev = {
    version: number;
-   bankPower: number;
+   bankPowerA: number;
+   bankPowerB: number;
    bankNo: number;
    contactorsMaskA: number;
    contactorsMaskB: number;
@@ -125,12 +132,15 @@ export interface FrameConfig {
 }
 export enum MsgId { 
    PING=0x01, 
-   PONG=0x02, 
+   PONG=0x02,
+   
    ACK=0x06, 
    NACK=0x15, 
+
    MEASUREMENTS=0x10, 
    SET_SETPOINT=0x20, 
-   INTERLOCKS=0x30 }
+   INTERLOCKS=0x30
+}
 export interface MeasurementChannel { 
    name:string; 
    value:number; 
@@ -140,6 +150,7 @@ export interface MeasurementChannel {
 export interface AckFrame { 
    id:MsgId.ACK; 
    seq:number }
+
 export interface NackFrame { 
    id:MsgId.NACK; 
    seq:number; 

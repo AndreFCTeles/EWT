@@ -7,11 +7,13 @@ import type { StepId } from '@/types/checklistTypes';
 
 // Steps
 import { PickProcessStep, PickPowerStep, PickBrandStep } from '@steps/ManualPickSteps';
+
 //import { ConnectionsStep, InterlocksStep, OcvStep } from '@steps/CoreTestSteps';
 import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
 import { DetectLBStep } from '@steps/DetectLBStep';
 import LBCalStep from '@steps/LBCalStep';
+import { TestLBStep } from '@/dev/TestLBStep';
 //import { DutSearchStep } from '@checklist/steps/DutSearchStep';
 //import { DutInfoStep } from '@/components/autoDut/DutInfoStep';
 
@@ -26,7 +28,9 @@ import LBCalStep from '@steps/LBCalStep';
 export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
    //login:/*-----------------*/SkipStep, //aproveita para detetar api, not rendered, aguarda LoginModal "success"
 
+
    detectPowerBank:/*-------*/DetectLBStep, //auto
+   testLBStep:                TestLBStep,
    pickProcedure:/*---------*/ProcedurePickerStep,
 
    //dutSearch:/*-------------*/SkipStep, //DutSearchStep,

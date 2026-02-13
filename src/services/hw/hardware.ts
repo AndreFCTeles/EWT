@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { delay } from "@utils/generalUtils";
 import {
    findFirstLoadBankFrame,
-   buildLoadBankFrame_7f,
+   buildLoadBankFrame,
    lbWriteBytes,
    waitForLoadBankMask,
    getLastLoadBankStatus,
@@ -42,11 +42,11 @@ export async function detectLoadBank(): Promise<LoadBankProbe> {
 
          // Ask Tauri to just listen (no TX) for a short window.
          const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { 
-            data: [], 
+            data: [],  // Serve de handshake?
             durationMs: DEV_ECHO_DELAY
          });
 
-         await invoke("close").catch(() => {});
+         await invoke("close").catch(() => {}); // todo: remove?
 
          const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
          if (!match) {
@@ -95,7 +95,7 @@ export async function setLoadBankContactors(opts: {
    portName: string;
    //baud?: number;
    lastStatus: LoadBankStatus; // to reuse version / bankPower / bankNo
-   contactorsMask: number;     // 16-bit mask, C1..C16
+   contactorsMask: number;
    timeoutMs?: number;
 }): Promise<LoadBankStatus> {
    //if (!opts.baud) opts.baud = 115200; // optional assertion
@@ -106,14 +106,14 @@ export async function setLoadBankContactors(opts: {
       contactorsMask: `0x${contactorsMask.toString(16)}`,
    });
 
-   // Build a frame using the last known meta-fields
-   const txFrame = buildLoadBankFrame_7f({
+   // Build a frame using the last known fields
+   const txFrame = buildLoadBankFrame({
       version: lastStatus.version,
       bankPower: lastStatus.bankPower,
       bankNo: lastStatus.bankNo,
-      contactorsMask,
 
-      // Send 0 in the error fields; the bank will fill them in its reply.
+      // Send 0 in the error fields; the bank provides true vals
+      contactorsMask,
       errContactors: 0,
       errFans: 0,
       errThermals: 0,
@@ -129,8 +129,8 @@ export async function setLoadBankContactors(opts: {
       timeoutMs: opts.timeoutMs ?? 2000,
    });
 
-   // prefer confirmed status (already newest), but keep fallback
-   return confirmed ?? getLastLoadBankStatus(portName) ?? confirmed;
+   // prefer confirmed status (already newest) - keep fallback
+   return confirmed ?? getLastLoadBankStatus(portName)!;// ?? confirmed;
 }
 
 

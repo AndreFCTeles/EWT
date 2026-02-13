@@ -1,7 +1,9 @@
 //does this thing even talk lmao
 
+//use encoding_rs::WINDOWS_1252;
 use serde::Serialize;
 use std::{
+    borrow::Cow,
     io::{Read, Write},
     sync::Mutex,
     time::{Duration, Instant},
@@ -12,14 +14,30 @@ pub struct SerialState {
     pub port: Mutex<Option<Box<dyn serialport::SerialPort>>>,
 }
 
+const FRAME_LEN: usize = 14;
+
 #[derive(Serialize)]
 pub struct Roundtrip {
     sent_bytes: Vec<u8>,
     recv_bytes: Vec<u8>,
+
+    // Full-stream
     sent_hex: String,
     recv_hex: String,
+
+    /*
     sent_ascii: String,
     recv_ascii: String,
+    */
+    // Protocol-shaped views
+    sent_frame_hex: String,
+    recv_frame_hex: String,
+
+    sent_debug_utf8: String,
+    recv_debug_utf8: String,
+
+    sent_debug_utf8_valid: bool,
+    recv_debug_utf8_valid: bool,
 }
 
 #[tauri::command]
@@ -104,6 +122,12 @@ pub fn test_roundtrip_bytes(
         }
     }
 
+    let (sent_frame, sent_tail) = split_frame_and_tail(&data);
+    let (recv_frame, recv_tail) = split_frame_and_tail(&buf);
+
+    let (sent_debug_utf8, sent_debug_utf8_valid) = decode_utf8_with_validity(sent_tail);
+    let (recv_debug_utf8, recv_debug_utf8_valid) = decode_utf8_with_validity(recv_tail);
+
     eprintln!(
         "[TAURI/COMM] roundtrip_bytes done: sent={:?} recv={:?}",
         data, buf
@@ -113,8 +137,20 @@ pub fn test_roundtrip_bytes(
         recv_bytes: buf.clone(),
         sent_hex: to_hex(&data),
         recv_hex: to_hex(&buf),
-        sent_ascii: to_ascii_pretty(&data),
-        recv_ascii: to_ascii_pretty(&buf),
+        /*
+        sent_ascii: to_ascii_pretty(&data), //to_ascii_pretty(&data),
+        recv_ascii: to_ascii_pretty(&buf),  //to_ascii_pretty(&buf),
+        sent_debug_utf8: to_text_pretty_crlf(&data),
+        recv_debug_utf8: to_text_pretty_crlf(&buf),
+        */
+        sent_frame_hex: to_hex(sent_frame),
+        recv_frame_hex: to_hex(recv_frame),
+
+        sent_debug_utf8,
+        recv_debug_utf8,
+
+        sent_debug_utf8_valid,
+        recv_debug_utf8_valid,
     })
 }
 
@@ -125,6 +161,8 @@ fn to_hex(data: &[u8]) -> String {
         .join(" ")
 }
 
+/*
+// OLD
 fn to_ascii_pretty(data: &[u8]) -> String {
     data.iter()
         .map(|&b| match b {
@@ -134,4 +172,126 @@ fn to_ascii_pretty(data: &[u8]) -> String {
             _ => '·', // non-printables as dots
         })
         .collect()
+}
+
+fn normalize_to_crlf(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut it = input.chars().peekable();
+
+    while let Some(ch) = it.next() {
+        match ch {
+            '\r' => {
+                if matches!(it.peek(), Some('\n')) {
+                    it.next();
+                }
+                out.push('\r');
+                out.push('\n');
+            }
+            '\n' => {
+                out.push('\r');
+                out.push('\n');
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn decode_text_auto(data: &[u8]) -> String {
+    match std::str::from_utf8(data) {
+        Ok(s) => s.to_string(),
+        Err(_) => {
+            let (cow, _, _) = WINDOWS_1252.decode(data);
+            cow.into_owned()
+        }
+    }
+}
+
+fn to_text_pretty_crlf(data: &[u8]) -> String {
+    let s = decode_text_auto(data);
+    let s = normalize_to_crlf(&s);
+
+    s.chars()
+        .map(|c| match c {
+            '\r' | '\n' | '\t' => c,
+            c if c.is_control() => '·',
+            _ => c,
+        })
+        .collect()
+}
+
+fn to_hex_dump(data: &[u8]) -> String {
+    const W: usize = 16;
+    let mut out = String::new();
+
+    for (i, chunk) in data.chunks(W).enumerate() {
+        let offset = i * W;
+
+        // offset
+        out.push_str(&format!("{:04X}: ", offset));
+
+        // hex area
+        for j in 0..W {
+            if j < chunk.len() {
+                out.push_str(&format!("{:02X} ", chunk[j]));
+            } else {
+                out.push_str("   ");
+            }
+        }
+
+        out.push_str(" |");
+
+        // text area (ASCII-ish, but keep printable range)
+        for &b in chunk {
+            let ch = match b {
+                0x20..=0x7E => b as char,
+                _ => '·',
+            };
+            out.push(ch);
+        }
+
+        out.push_str("|\r\n");
+    }
+
+    out
+}
+     */
+
+fn split_frame_and_tail(data: &[u8]) -> (&[u8], &[u8]) {
+    let n = FRAME_LEN.min(data.len());
+    (&data[..n], &data[n..])
+}
+
+fn decode_utf8_with_validity(bytes: &[u8]) -> (String, bool) {
+    match std::str::from_utf8(bytes) {
+        Ok(s) => (normalize_to_crlf(s).into_owned(), true),
+        Err(_) => {
+            let s: Cow<str> = String::from_utf8_lossy(bytes);
+            (normalize_to_crlf(&s).into_owned(), false)
+        }
+    }
+}
+
+fn normalize_to_crlf(s: &str) -> Cow<'_, str> {
+    if !s.contains('\n') && !s.contains('\r') {
+        return Cow::Borrowed(s);
+    }
+
+    let mut out = String::with_capacity(s.len());
+    let mut it = s.chars().peekable();
+
+    while let Some(ch) = it.next() {
+        match ch {
+            '\r' => {
+                if matches!(it.peek(), Some('\n')) {
+                    it.next();
+                }
+                out.push_str("\r\n");
+            }
+            '\n' => out.push_str("\r\n"),
+            _ => out.push(ch),
+        }
+    }
+
+    Cow::Owned(out)
 }

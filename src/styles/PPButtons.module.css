@@ -35,10 +35,8 @@
    height: 100% !important;
    min-height: 0 !important;
 
-   /* override Mantine's sizing variable too */
    --button-height: 100% !important;
 
-   /* optional: make sure it stretches to the grid cell */
    align-self: stretch;
    width: 100%;
    font-size: xx-large;
@@ -47,7 +45,7 @@
 
 /* SWITCHES */
 .thumb {
-   padding: 10% 5% 10% 5%;
+   padding: 10%;
 }
 
 .thumb:hover,
@@ -69,7 +67,6 @@
       background-color 200ms ease,
       border-color 200ms ease;
    width: 180px;
-   height: 100px;
    padding: 15% 20% 15% 20%;
 
 
@@ -79,11 +76,17 @@
       border-color: var(--mantine-color-blue-9);
 
       &>.thumb {
-         /*background-color: var(--mantine-color-black);*/
-
          &::before {
             background-color: var(--mantine-color-blue-9);
          }
+      }
+
+      &:hover>.thumb {
+         background-color: var(--mantine-color-gray-3);
+      }
+
+      &:hover>.track {
+         background-color: var(--mantine-color-blue-7);
       }
    }
 
@@ -92,8 +95,6 @@
       border-color: var(--mantine-color-blue-9);
 
       &>.thumb {
-         /*background-color: var(--mantine-color-black);*/
-
          &::before {
             background-color: var(--mantine-color-blue-9);
          }

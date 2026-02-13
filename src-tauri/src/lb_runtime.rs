@@ -53,11 +53,9 @@ pub struct LoadBankHealth {
 
 // -------------------- Protocol constants --------------------
 
-const LB_FRAME_LEN: usize = 16;
-const LB_START: u8 = 0x01;
-const LB_STOP: u8 = 0x00;
+const LB_FRAME_LEN: usize = 14;
 
-// Copy of your TS CRC8_TABLE (same values, but u8)
+// Copy of your TS CRC8_TABLE
 const CRC8_TABLE: [u8; 256] = [
     0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65, 157, 195, 33, 127, 252,
     162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220, 35, 125, 159, 193, 66, 28, 254, 160, 225, 191,
@@ -76,54 +74,44 @@ const CRC8_TABLE: [u8; 256] = [
 
 fn crc8_load_bank(frame: &[u8]) -> u8 {
     let mut crc: u8 = 0;
-    for i in 1..13 {
+    for i in 0..12 {
         crc = CRC8_TABLE[(crc ^ frame[i]) as usize];
     }
     crc
 }
-
-fn decode_u8(encoded: u8) -> u8 {
-    encoded.wrapping_sub(0x02)
-}
-
-fn decode_u16(hi: u8, lo: u8) -> u16 {
+fn u16_to_bytes(hi: u8, lo: u8) -> u16 {
     let encoded = ((hi as u16) << 8) | (lo as u16);
-    encoded.wrapping_sub(0x0002) //0x0202 ?
+    encoded
 }
 
 fn parse_frame(frame: &[u8], port_name: &str) -> Option<LoadBankStatus> {
-    if frame.len() != LB_FRAME_LEN {
+    /*if frame.len() != LB_FRAME_LEN { // check if intended, might prevent debug, might be intended for prod
         return None;
-    }
-    if frame[0] != LB_START || frame[15] != LB_STOP {
-        return None;
-    }
-    if frame[14] != crc8_load_bank(frame) {
+    }*/
+    if frame[LB_FRAME_LEN - 1] != crc8_load_bank(frame) {
         return None;
     }
 
     Some(LoadBankStatus {
         port_name: port_name.to_string(),
-        version: decode_u8(frame[1]),
-        bank_power: decode_u16(frame[2], frame[3]),
-        bank_no: decode_u8(frame[4]),
-        contactors_mask: decode_u16(frame[5], frame[6]),
-        err_contactors: decode_u16(frame[7], frame[8]),
-        err_fans: decode_u16(frame[9], frame[10]),
-        err_thermals: decode_u16(frame[11], frame[12]),
-        other_errors: decode_u8(frame[13]),
+        version: frame[0],
+        bank_power: u16_to_bytes(frame[1], frame[2]),
+        bank_no: frame[3],
+        contactors_mask: u16_to_bytes(frame[4], frame[5]),
+        err_contactors: u16_to_bytes(frame[6], frame[7]),
+        err_fans: u16_to_bytes(frame[8], frame[9]),
+        err_thermals: u16_to_bytes(frame[10], frame[11]),
+        other_errors: frame[12],
     })
 }
 
 fn pop_first_valid_status(buf: &mut Vec<u8>, port_name: &str) -> Option<LoadBankStatus> {
     let mut i = 0usize;
     while i + LB_FRAME_LEN <= buf.len() {
-        if buf[i] == LB_START && buf[i + 15] == LB_STOP {
-            let slice = &buf[i..i + LB_FRAME_LEN];
-            if let Some(status) = parse_frame(slice, port_name) {
-                buf.drain(0..i + LB_FRAME_LEN);
-                return Some(status);
-            }
+        let slice = &buf[i..i + LB_FRAME_LEN];
+        if let Some(status) = parse_frame(slice, port_name) {
+            buf.drain(0..i + LB_FRAME_LEN);
+            return Some(status);
         }
         i += 1;
     }
@@ -141,7 +129,6 @@ fn stop_handle(h: RuntimeHandle) {
 }
 
 // -------------------- Commands --------------------
-
 #[tauri::command]
 pub fn lb_start_polling(
     app: AppHandle,
@@ -262,8 +249,6 @@ pub fn lb_start_polling(
         }
     });
 
-    //*guard = Some(RuntimeHandle { tx, join });
-
     *state.inner.lock().unwrap() = Some(RuntimeHandle {
         port_name,
         baud,
@@ -275,14 +260,6 @@ pub fn lb_start_polling(
 
 #[tauri::command]
 pub fn lb_stop_polling(state: State<LoadBankRuntimeState>) -> Result<(), String> {
-    /*
-    let handle = state.inner.lock().unwrap().take();
-    if let Some(h) = handle {
-        let _ = h.tx.send(RuntimeCmd::Stop);
-        let _ = h.join.join();
-    }
-    */
-
     let old = state.inner.lock().unwrap().take();
     if let Some(h) = old {
         stop_handle(h);
