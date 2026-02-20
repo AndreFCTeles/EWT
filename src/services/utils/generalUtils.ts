@@ -22,9 +22,16 @@ export function serialToFormatDate(value: number | string | undefined) {
    return d.isValid() ? d.format("DD-MM-YYYY") : null;
 }
 
-export const roundTo5 = (value: number): number => Math.round(value / 5) * 5;
+// TODO:
+export const roundTo5 = (value: number): number => Math.round(value / 5) * 5; // remove this after
+// IMPLEMENT ROUND TO INT
 
 export const maskHex = (mask?: number) => {
    if (mask == null) return "—";
    return "0x" + mask.toString(16).toUpperCase().padStart(4, "0");
+}
+
+export const toHex = (bytes: number[] | Uint8Array): string => {
+   const arr = bytes instanceof Uint8Array ? Array.from(bytes) : bytes;
+   return arr.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
 }

@@ -6,7 +6,10 @@ use does_it_talk::{
 use export_xlsx::{export_xlsx, parse_xlsx_from_dialog, parse_xlsx_path, pick_xlsx_path};
 use import::read_file_to_string;
 use import_tool_cal_files::parse_tool_calibration;
-use lb_runtime::{lb_start_polling, lb_stop_polling, lb_write_bytes, LoadBankRuntimeState};
+use lb_runtime::{
+    lb_set_polling, lb_start_polling, lb_stop_polling, lb_write_bytes, list_ports_detailed,
+    LoadBankRuntimeState,
+};
 use std::sync::Mutex;
 use upload_tool_cal_files::upload_calibration_file;
 
@@ -39,7 +42,7 @@ pub fn run() {
             max_runtime,
             max_memory,
             list_process,
-            start_clock,
+            //start_clock, // not needed (?)
             // comm debug
             list_ports,
             close,
@@ -49,7 +52,9 @@ pub fn run() {
             // UART comms & calibration
             lb_start_polling,
             lb_stop_polling,
+            lb_set_polling,
             lb_write_bytes,
+            list_ports_detailed,
             // import/export files
             read_file_to_string,
             pick_xlsx_path,

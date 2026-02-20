@@ -12,15 +12,10 @@ import {
 } from "@/dev/devConfig"; 
 import { Roundtrip} from "@/types/loadBankTypes";
 import { buildLoadBankFrame,  findFirstLoadBankFrame } from "@/services/hw/lbProtocol"; 
+import { toHex } from "@/services/utils/generalUtils";
 
 
 
-
-
-function toHex(bytes: number[] | Uint8Array): string {
-   const arr = bytes instanceof Uint8Array ? Array.from(bytes) : bytes;
-   return arr.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
-}
 
 
 export default function DevEchoPcbTest() {
@@ -37,6 +32,7 @@ export default function DevEchoPcbTest() {
    const [frameVersion, setFrameVersion] = useState<number>(1)
    const [framePower, setFramePower] = useState<number>(DEV_ECHO_POWER)
    const [frameNo, setFrameNo] = useState<number>(DEV_ECHO_BANK_NO)
+   const [frameHealth, setFrameHealth] = useState<number>(0)
    const [frameContactors, setFrameContactors] = useState<number>(0)
    const [frameErrContactors, setFrameErrContactors] = useState<number>(0)
    const [frameErrFans, setFrameErrFans] = useState<number>(0)
@@ -71,6 +67,7 @@ export default function DevEchoPcbTest() {
             version: frameVersion,
             bankPower: framePower,
             bankNo: frameNo,
+            bankHealth: frameHealth,
             contactorsMask: frameContactors,
             errContactors: frameErrContactors,
             errFans: frameErrFans,
@@ -182,6 +179,11 @@ export default function DevEchoPcbTest() {
                label="Bank Nº" 
                value={frameNo} 
                onChange={(v) => setFrameNo(Number(v))}
+               />
+               <NumberInput 
+               label="Bank Health" 
+               value={frameHealth} 
+               onChange={(v) => setFrameHealth(Number(v))}
                />
                <NumberInput 
                label="Contactors" 

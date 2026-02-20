@@ -14,7 +14,7 @@ pub struct SerialState {
     pub port: Mutex<Option<Box<dyn serialport::SerialPort>>>,
 }
 
-const FRAME_LEN: usize = 14;
+const FRAME_LEN: usize = 15;
 
 #[derive(Serialize)]
 pub struct Roundtrip {
@@ -132,6 +132,10 @@ pub fn test_roundtrip_bytes(
         "[TAURI/COMM] roundtrip_bytes done: sent={:?} recv={:?}",
         data, buf
     );
+    eprintln!(
+        "[TAURI/COMM] [TEST] roundtrip_bytes UTF: sent={:?} recv={:?}",
+        sent_debug_utf8, recv_debug_utf8
+    );
     Ok(Roundtrip {
         sent_bytes: data.clone(),
         recv_bytes: buf.clone(),
@@ -160,102 +164,6 @@ fn to_hex(data: &[u8]) -> String {
         .collect::<Vec<_>>()
         .join(" ")
 }
-
-/*
-// OLD
-fn to_ascii_pretty(data: &[u8]) -> String {
-    data.iter()
-        .map(|&b| match b {
-            0x20..=0x7E => b as char, // printable
-            b'\r' => '␍',
-            b'\n' => '␊',
-            _ => '·', // non-printables as dots
-        })
-        .collect()
-}
-
-fn normalize_to_crlf(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    let mut it = input.chars().peekable();
-
-    while let Some(ch) = it.next() {
-        match ch {
-            '\r' => {
-                if matches!(it.peek(), Some('\n')) {
-                    it.next();
-                }
-                out.push('\r');
-                out.push('\n');
-            }
-            '\n' => {
-                out.push('\r');
-                out.push('\n');
-            }
-            _ => out.push(ch),
-        }
-    }
-    out
-}
-
-fn decode_text_auto(data: &[u8]) -> String {
-    match std::str::from_utf8(data) {
-        Ok(s) => s.to_string(),
-        Err(_) => {
-            let (cow, _, _) = WINDOWS_1252.decode(data);
-            cow.into_owned()
-        }
-    }
-}
-
-fn to_text_pretty_crlf(data: &[u8]) -> String {
-    let s = decode_text_auto(data);
-    let s = normalize_to_crlf(&s);
-
-    s.chars()
-        .map(|c| match c {
-            '\r' | '\n' | '\t' => c,
-            c if c.is_control() => '·',
-            _ => c,
-        })
-        .collect()
-}
-
-fn to_hex_dump(data: &[u8]) -> String {
-    const W: usize = 16;
-    let mut out = String::new();
-
-    for (i, chunk) in data.chunks(W).enumerate() {
-        let offset = i * W;
-
-        // offset
-        out.push_str(&format!("{:04X}: ", offset));
-
-        // hex area
-        for j in 0..W {
-            if j < chunk.len() {
-                out.push_str(&format!("{:02X} ", chunk[j]));
-            } else {
-                out.push_str("   ");
-            }
-        }
-
-        out.push_str(" |");
-
-        // text area (ASCII-ish, but keep printable range)
-        for &b in chunk {
-            let ch = match b {
-                0x20..=0x7E => b as char,
-                _ => '·',
-            };
-            out.push(ch);
-        }
-
-        out.push_str("|\r\n");
-    }
-
-    out
-}
-     */
 
 fn split_frame_and_tail(data: &[u8]) -> (&[u8], &[u8]) {
     let n = FRAME_LEN.min(data.len());

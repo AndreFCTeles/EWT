@@ -2,15 +2,23 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { delay } from "@utils/generalUtils";
 import {
-   findFirstLoadBankFrame,
+   //findFirstLoadBankFrame,
    buildLoadBankFrame,
+   lbSetPolling, 
    lbWriteBytes,
    waitForLoadBankMask,
    getLastLoadBankStatus,
+   startLoadBankPolling
 } from "./lbProtocol";
 
 import type { InterlockState } from "@/types/generalTypes"; 
-import type { Roundtrip, LoadBankProbe, LoadBankStatus } from "@/types/loadBankTypes";
+import type { 
+   //Roundtrip, 
+   LoadBankProbe, 
+   LoadBankStatus, 
+   LoadBankHealth, 
+   SerialPortInfo 
+} from "@/types/loadBankTypes";
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
 
@@ -29,34 +37,20 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 export async function detectLoadBank(): Promise<LoadBankProbe> {
    console.log("[LB/HW] Probing load bank...");
 
-   // If runtime was running, stop it before debug probing (safe best-effort)
-   await invoke("lb_stop_polling").catch(() => {});
-
-   const ports = await invoke<string[]>("list_ports");
+   const portInfo = await invoke<SerialPortInfo[]>("list_ports_detailed");
+   const ports = portInfo.map((p) => p.portName as string);
+   /*
+   const ports = portInfo.length
+      ? portInfo.map((p) => p.portName as string)
+      : await invoke<string[]>("list_ports");
+   */
    console.log("[LB/HW] Available ports:", ports);
    const baud = DEV_ECHO_BAUD;
 
    for (const portName of ports) {
       try {
-         await invoke("connect", { portName, baud });
-
-         // Ask Tauri to just listen (no TX) for a short window.
-         const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { 
-            data: [],  // Serve de handshake?
-            durationMs: DEV_ECHO_DELAY
-         });
-
-         await invoke("close").catch(() => {}); // todo: remove?
-
-         const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
-         if (!match) {
-            console.debug("[LB/HW] No valid LB frame on", portName);
-            continue;
-         }
-
-
-         const parsed = match.parsed;
-         const status: LoadBankStatus = { ...parsed, portName };
+         const status = await probePortForStatus(portName, baud, DEV_ECHO_DELAY);
+         if (!status) continue;
 
          console.log("[LB/HW] Load bank detected on", portName, status);
 
@@ -64,13 +58,13 @@ export async function detectLoadBank(): Promise<LoadBankProbe> {
             connected: true,
             portName,
             status,
-            bank_power: parsed.bankPower,
-            bank_no: parsed.bankNo,
+            bank_power: status.bankPower,
+            bank_no: status.bankNo,
+            bank_health: status.bankHealth
          };
 
       } catch (err) {
-         //try { await invoke("close"); } catch { /* ignore */ }
-         console.warn("[LB/HW] Error probing port",portName,"-", err);
+         console.warn("[LB/HW] Error probing port", portName,"-", err);
          await invoke("close").catch(() => {});
       }
    }
@@ -111,6 +105,8 @@ export async function setLoadBankContactors(opts: {
       version: lastStatus.version,
       bankPower: lastStatus.bankPower,
       bankNo: lastStatus.bankNo,
+
+      bankHealth: lastStatus.bankHealth,
 
       // Send 0 in the error fields; the bank provides true vals
       contactorsMask,
@@ -183,16 +179,10 @@ export async function applyLoadBankMaskSequence(opts: {
 // Check LB Status -- DEBUG
 // ───────────────────────────────────────────────────────────────────────────────
 export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_BAUD): Promise<LoadBankStatus | null> {
-   await invoke("lb_stop_polling").catch(() => {}); // avoid port fight
+   const status = await probePortForStatus(portName, baud, DEV_ECHO_DELAY);
+   if (!status) return null;
 
-   await invoke("connect", { portName, baud });
-   const roundtrip = await invoke<Roundtrip>("test_roundtrip_bytes", { data: [], durationMs: DEV_ECHO_DELAY });
-   await invoke("close").catch(() => {});
-
-   const match = findFirstLoadBankFrame(roundtrip.recv_bytes);
-   if (!match) return null;
-
-   return { ...match.parsed, portName };
+   return { ...status, portName };
 }
 
 
@@ -260,14 +250,6 @@ class SignalsClass implements Signals {
       const noise = (Math.random() - 0.5) * 2.0; // ±1.0 V
       return { voltage: 80 + noise };
    }
-
-   // DEV ONLY: allow test code to tweak the stubbed state (not used by steps directly)
-   /*
-   setState(patch: Partial<InterlockState>) {
-      this.state = { ...this.state, ...patch };
-      this.emit();
-   }
-   */
 }
 
 export const signals: Signals = new SignalsClass();
@@ -305,3 +287,144 @@ export async function waitForSignal(
 
 
 
+
+
+
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Utility: poll and wait for status
+// ───────────────────────────────────────────────────────────────────────────────
+
+
+async function probePortForStatus(
+   portName: string,
+   baud: number,
+   timeoutMs = 400
+): Promise<LoadBankStatus | null> {
+   const ac = new AbortController();
+
+   // This stop() only unsubscribes *this* probe; runtime stops only if nobody is listening.
+   let stop: (() => Promise<void>) | null = null;
+
+   try {
+      let resolveStatus!: (v: LoadBankStatus | null) => void;
+      const statusPromise = new Promise<LoadBankStatus | null>((resolve) => {
+         resolveStatus = resolve;
+      });
+
+      const timer = window.setTimeout(() => resolveStatus(null), timeoutMs);
+
+      // Make sure we have stop() before we start waiting (avoids races).
+      stop = await startLoadBankPolling(
+         portName,
+         (s) => {
+            clearTimeout(timer);
+            resolveStatus(s);
+         },
+         baud,
+         ac.signal,
+         (_h: LoadBankHealth) => {}
+      );
+
+      // Optional: enable a lightweight poll frame during probing.
+      // If your device streams statuses autonomously, you can remove this.
+      try {
+         const probeFrame = buildLoadBankFrame({
+         version: 1,
+         bankPower: 600,
+         bankNo: 1,
+         bankHealth: 0,
+         contactorsMask: 0,
+         errContactors: 0,
+         errFans: 0,
+         errThermals: 0,
+         otherErrors: 0,
+         });
+         await lbSetPolling(true, 150, probeFrame);
+      } catch {
+         // ignore (probing can still work if device streams by itself)
+      }
+
+      return await statusPromise;
+   } finally {
+      ac.abort();
+      try {
+         await lbSetPolling(false, 200, new Uint8Array());
+      } catch {
+         // ignore
+      }
+      if (stop) await stop().catch(() => {});
+   }
+}
+
+
+/*
+async function probePortForStatus(
+   portName: string, 
+   baud: number, 
+   timeoutMs = 400
+): Promise<LoadBankStatus | null> {
+   const ac = new AbortController();
+*/
+
+   // OLD
+   /*
+   let stop: null | (() => Promise<void>) = null;
+
+   try {
+      const status = await new Promise<LoadBankStatus | null>((resolve) => {
+         const timer = window.setTimeout(() => resolve(null), timeoutMs);
+
+         startLoadBankPolling(
+            portName,
+            (s) => { 
+               clearTimeout(timer); 
+               resolve(s); },
+            baud,
+            ac.signal,
+            (_h: LoadBankHealth) => {}
+         ).then((fn) => { stop = fn; });
+      });
+
+      return status;
+   } finally {
+      ac.abort();
+      if (stop) await stop().catch(() => {});
+   }
+      */
+
+   
+   // NEW
+   /*
+   let timer: number | undefined;
+
+   // Resolve on first status or timeout
+   let resolve!: (v: LoadBankStatus | null) => void;
+   const p = new Promise<LoadBankStatus | null>((r) => (resolve = r));
+
+   const onStatus = (s: LoadBankStatus) => {
+      if (timer) window.clearTimeout(timer);
+      resolve(s);
+   };
+
+   // Start polling and immediately get stop handle (no race condition)
+   const stop = await startLoadBankPolling(
+      portName,
+      onStatus,
+      baud,
+      ac.signal,
+      (_h: LoadBankHealth) => {}
+   );
+
+   // Arm timeout after subscription is active
+   timer = window.setTimeout(() => resolve(null), timeoutMs);
+
+   try {
+      return await p;
+   } finally {
+      if (timer) window.clearTimeout(timer);
+      ac.abort(); // triggers stop too, but we also call stop() explicitly to be deterministic AND PEDANTIC also quite annoying
+      await stop().catch(() => {});
+   }
+}
+   */

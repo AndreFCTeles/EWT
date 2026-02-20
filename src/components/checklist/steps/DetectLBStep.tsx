@@ -1,13 +1,19 @@
-import { useEffect } from 'react';
-import { invoke } from "@tauri-apps/api/core";
+import React, { useEffect, useRef, useState } from 'react';
+//import { invoke } from "@tauri-apps/api/core";
 
-import { detectLoadBank } from '@/services/hw/hardware';
+//import { detectLoadBank } from '@/services/hw/hardware';
 import { nowIso } from '@utils/generalUtils';
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import type { LoadBankProbe, LoadBankStatus } from '@/types/loadBankTypes';
-import { DEV_ECHO_ENABLED, DEV_ECHO_PORT, DEV_ECHO_POWER, DEV_ECHO_BANK_NO } from '@/dev/devConfig'
-
+import { DEV_ECHO_ENABLED, DEV_ECHO_PORT, DEV_ECHO_POWER, DEV_ECHO_BANK_NO, DEV_ECHO_BAUD } from '@/dev/devConfig'
+import { 
+   ensureLoadBankConnected, 
+   initLoadBankMonitoring, 
+   getLBState, 
+   subscribeLB
+} from '@/services/hw/loadBankRuntimeStore';
+import { startLoadBankPolling } from '@/services/hw/lbProtocol';
 
 
 
@@ -18,10 +24,76 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
    id,
    isActive,
    //alreadyCompleted,
-   submission,
+   //submission,
    complete,
-   abort,
+   //abort,
 } ) => {
+   const startedRef = useRef(false);
+   const [status, setStatus] = useState<LoadBankStatus | null>(null);
+   
+   
+   useEffect(() => {
+      if (startedRef.current) return;
+      startedRef.current = true;
+
+      // Main path: just ensure monitoring is running.
+      void ensureLoadBankConnected().catch((err) => {
+         console.warn("[LB/DetectStep] ensureLoadBankConnected failed", err);
+      });
+
+      // Subscribe to store updates
+      const unsub = subscribeLB(() => {
+         const s = getLBState();
+         if (s.portName) {
+         setStatus((prev) =>
+            prev
+               ? {
+                  ...prev,
+                  portName: s.portName!,
+                  bankPower: s.bankPower ?? prev.bankPower,
+                  bankNo: s.bankNo ?? prev.bankNo,
+                  bankHealth: s.bankHealth ?? prev.bankHealth,
+               }
+               : null
+         );
+         }
+      });
+
+      // Optional dev fallback: start a quick poll on a known dev echo port.
+      // IMPORTANT: this no longer calls lb_stop_polling, to avoid interrupting runtime.
+      // If you keep this, only enable it when you are *not* connected to the real load bank.
+      void (async () => {
+         const st = getLBState();
+         if (st.phase === "connected" || st.phase === "probing") return;
+
+         try {
+         const ac = new AbortController();
+         const stop = await startLoadBankPolling(
+            DEV_ECHO_PORT,
+            (s) => {
+               setStatus(s);
+            },
+            DEV_ECHO_BAUD,
+            ac.signal
+         );
+
+         // Auto-stop after a short window.
+         setTimeout(() => {
+            ac.abort();
+            void stop();
+         }, 800);
+         } catch (err) {
+         console.warn("[LB/DetectStep] dev fallback failed", err);
+         }
+      })();
+
+      console.log(status ? `LB: ${status.portName}` : "LB: none")
+      return () => {
+         unsub();
+      };
+   }, []);
+
+
    useEffect(() => {
       if (!isActive) return;
       let cancelled = false;
@@ -29,12 +101,16 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
       (async () => {
          console.log("[DetectLoadBank] Starting probe...");
 
-         // Ensure runtime poller is not holding the port while we do debug probing.
-         await invoke("lb_stop_polling").catch(() => {});
+         // Ensure runtime poller is not holding the port while we do debug probing. - NOT NEEDED RN
+         //await invoke("lb_stop_polling").catch(() => {});
 
          let probe: LoadBankProbe;
+         //let probe = initLoadBankMonitoring();
+         //let probe;
+
          try {
-            probe = await detectLoadBank();
+            //probe = await detectLoadBank();
+            probe = await initLoadBankMonitoring();
          } catch (err) {
             console.error("[DetectLoadBank] Probe error", err);
 
@@ -65,6 +141,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                version: 0,
                bankPower: DEV_ECHO_POWER,
                bankNo: DEV_ECHO_BANK_NO,
+               bankHealth: 0,
                contactorsMask: 0,
                errContactors: 0,
                errFans: 0,
@@ -80,6 +157,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
                status: devStatus,
                bank_power: DEV_ECHO_POWER,
                bank_no: DEV_ECHO_BANK_NO,
+               bank_health: 0
             };
 
             complete(
@@ -128,7 +206,7 @@ export const DetectLBStep: React.FC<StepRuntimeProps> = ( {
       })();
 
       return () => { cancelled = true; };
-   }, [id, isActive, complete, abort, submission]);
+   }, [id, isActive, complete]); // , abort, submission
 
    // Auto step: no UI, just side-effect.
    return null;

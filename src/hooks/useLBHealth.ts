@@ -24,8 +24,8 @@ export default function useLoadBankLive(portName: string | null): LoadBankLive {
          await startLoadBankPolling(
             portName,
             (s) => setStatus(s),
-            ac.signal,
             DEV_ECHO_BAUD,
+            ac.signal,
             (h) => setHealth(h)
          );
       })().catch(console.error);
@@ -38,3 +38,4 @@ export default function useLoadBankLive(portName: string | null): LoadBankLive {
       return { portName, status, health, online };
    }, [portName, status, health]);
 }
+

@@ -4,7 +4,7 @@ import { Unit } from "./checklistTypes";
 /* ──────────────────────────────────────────────────────────────────────────────
    Load bank protocol constants
 ────────────────────────────────────────────────────────────────────────────── */
-export const LB_FRAME_LEN = 14;
+export const LB_FRAME_LEN = 15;
 //export const LB_START = 0x01;
 //export const LB_STOP = 0x00;
 
@@ -60,7 +60,19 @@ export type LoadBankProbe =
          status: LoadBankStatus;
          bank_power: number;
          bank_no: number;
+         bank_health: number;
       };
+
+export type SerialPortInfo = {
+   portName: string;
+   portType: string;
+   vId?: Uint16Array;
+   pId?: Uint16Array;
+   serialNumber?: string;
+   manufacturer?:  string;
+   product?: string;
+};
+
 export type LoadBankHealth = {
    portName: string;
    online: boolean;
@@ -72,6 +84,9 @@ export type LoadBankFrame = {
    version: number;  
    bankPower: number;   
    bankNo: number;     
+   
+   bankHealth: number;
+
    contactorsMask: number; 
    errContactors: number;
    errFans: number;
@@ -79,21 +94,6 @@ export type LoadBankFrame = {
    otherErrors: number;   
 };
 
-export type LoadBankFrameDev = {
-   version: number;
-   bankPowerA: number;
-   bankPowerB: number;
-   bankNo: number;
-   contactorsMaskA: number;
-   contactorsMaskB: number;
-   errContactorsA: number;
-   errContactorsB: number;
-   errFansA: number;
-   errFansB: number;
-   errThermalsA: number;
-   errThermalsB: number;
-   otherErrors: number;
-};
 export type LoadBankStatus = LoadBankFrame & {
    portName: string;
    rawFrameHex?: string;

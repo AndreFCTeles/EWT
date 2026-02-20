@@ -20,7 +20,7 @@ import { nowIso } from "@utils/generalUtils";
 import type { Dut, Process, Verdict } from "@/types/checklistTypes"; 
 import type { LoadBankProbe, LoadBankStatus } from "@/types/loadBankTypes";
 import type { SetpointConfig } from "@/types/calibrationTypes";
-import { DEV_ECHO_COUNT } from "@/dev/devConfig";
+import { DEV_ECHO_BAUD, DEV_ECHO_COUNT } from "@/dev/devConfig";
 
 import DevEchoPcbTest from "@/dev/DevEchoPcbTest";
 
@@ -151,7 +151,8 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
                setBankStatus(s);
                updateDutyCycleFromMask(s.contactorsMask ?? 0);
             }, 
-            controller.signal
+            DEV_ECHO_BAUD,
+            controller.signal, // abortSignal
          );
          if (cancelled) {
             await stop();

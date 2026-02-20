@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useMachine } from '@xstate/react';
 
 import { checklistMachine, wasCompleted, type StepRuntimeProps } from './pipeline';
@@ -63,20 +63,42 @@ export function ChecklistController({
       }
       return -1;
    }, [idx, pipeline]);
+
+   /*
    const goBack = () => {
       if (prevManualIndex >= 0) {
          send({ type: 'BACK_TO', to: pipeline[prevManualIndex] });
       }
    };
+   */
+   const goBack = useCallback(() => {
+      if (prevManualIndex >= 0) {
+         send({ type: 'BACK_TO', to: pipeline[prevManualIndex] });
+      }
+   }, [send, prevManualIndex, pipeline]);
 
-
+   /*
    const apply = (record: StepRecord, patchVars?: Record<string, unknown>) =>
       send({ type: 'APPLY', record, patchVars });
+   */
+   const apply = useCallback(
+      (record: StepRecord, patchVars?: Record<string, unknown>) =>
+         send({ type: 'APPLY', record, patchVars }),
+      [send]
+   );
 
+   /*
    const complete = (record: StepRecord, patchVars?: Record<string, unknown>) =>
       send({ type: 'COMPLETE', record, patchVars });
+   */
+   const complete = useCallback(
+      (record: StepRecord, patchVars?: Record<string, unknown>) =>
+         send({ type: 'COMPLETE', record, patchVars }),
+      [send]
+);
 
-   const abort = (reason: string) => send({ type: 'ABORT', reason });
+   //const abort = (reason: string) => send({ type: 'ABORT', reason });
+   const abort = useCallback((reason: string) => send({ type: 'ABORT', reason }), [send]);
 
    const StepComp = ((STEP_REGISTRY)[activeId] as React.FC<StepRuntimeProps>) ?? SkipStep;
 

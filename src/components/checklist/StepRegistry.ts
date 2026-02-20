@@ -13,7 +13,7 @@ import { ProcedurePickerStep } from '@steps/ProcedurePickerStep';
 import { SummaryStep, ExportStep } from '@steps/SummaryExport';
 import { DetectLBStep } from '@steps/DetectLBStep';
 import LBCalStep from '@steps/LBCalStep';
-import { TestLBStep } from '@/dev/TestLBStep';
+//import { TestLBStep } from '@/dev/TestLBStep';
 //import { DutSearchStep } from '@checklist/steps/DutSearchStep';
 //import { DutInfoStep } from '@/components/autoDut/DutInfoStep';
 
@@ -30,7 +30,7 @@ export const STEP_REGISTRY: Record<StepId, React.FC<StepRuntimeProps>> = {
 
 
    detectPowerBank:/*-------*/DetectLBStep, //auto
-   testLBStep:                TestLBStep,
+   //testLBStep:                TestLBStep,
    pickProcedure:/*---------*/ProcedurePickerStep,
 
    //dutSearch:/*-------------*/SkipStep, //DutSearchStep,
