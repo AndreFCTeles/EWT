@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+/*import { useEffect, useMemo, useState } from "react";
 import type { LoadBankLive, LoadBankStatus, LoadBankHealth } from "@/types/loadBankTypes";
 import { getLastLoadBankStatus, startLoadBankPolling } from "@/services/hw/lbProtocol";
 import { DEV_ECHO_BAUD } from "@/dev/devConfig";
@@ -23,19 +23,45 @@ export default function useLoadBankLive(portName: string | null): LoadBankLive {
       (async () => {
          await startLoadBankPolling(
             portName,
-            (s) => setStatus(s),
+            (s: LoadBankStatus) => setStatus(s),
             DEV_ECHO_BAUD,
             ac.signal,
-            (h) => setHealth(h)
+            (h: LoadBankHealth) => setHealth(h)
          );
       })().catch(console.error);
 
-      return () => ac.abort();
+      return () => {
+         ac.abort();
+         void stop?.()
+      }
    }, [portName]);
 
    return useMemo(() => {
       const online = health?.online ?? false;
       return { portName, status, health, online };
    }, [portName, status, health]);
-}
+}*/
 
+import { useLoadBankRuntime } from "./useLoadBankRuntime";
+
+/** Convenience wrapper around the runtime store state */
+export function useLBHealth(cfg?: { autoStart?: boolean }) {
+   const rt = useLoadBankRuntime({ autoStart: cfg?.autoStart });
+
+   return {
+      phase: rt.phase,
+      portName: rt.portName,
+      online: rt.online,
+      reason: rt.reason,
+      bankPower: rt.bankPower,
+      bankNo: rt.bankNo,
+      bankHealth: rt.bankHealth,
+      hasErrors: rt.hasErrors,
+      lastStatus: rt.lastStatus,
+      lastHealth: rt.lastHealth,
+
+      initLoadBankMonitoring: rt.initLoadBankMonitoring,
+      ensureLoadBankConnected: rt.ensureLoadBankConnected,
+      stopLoadBankAutoDetect: rt.stopLoadBankAutoDetect,
+   };
+}

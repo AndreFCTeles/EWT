@@ -105,3 +105,7 @@
 label {
    line-height: normal;
 }
+
+input {
+   margin: auto;
+}

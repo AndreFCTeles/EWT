@@ -1,7 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { CRC8_TABLE, LB_FRAME_LEN} from "@/types/loadBankTypes";
-import type { LoadBankStatus, LoadBankHealth, LoadBankFrame } from "@/types/loadBankTypes"; 
+import type { 
+   LoadBankStatus, 
+   LoadBankHealth, 
+   LoadBankFrame,
+   SerialRxChunk,
+   SerialTxChunk,
+} from "@/types/loadBankTypes"; 
 import { 
    DEV_ECHO_BAUD, 
    DEV_ECHO_DELAY, 
@@ -11,8 +17,11 @@ import { toHex } from "../utils/generalUtils";
 
 
 
+// -----------------------------------------------------------------------------
+// Protocol helpers
+// -----------------------------------------------------------------------------
 
-
+// CRC8 Dallas/Maxim 
 function crc8LoadBank(frame: Uint8Array): number {
    if (frame.length < LB_FRAME_LEN) {
       throw new Error(`frame too short for CRC : frame length ${frame.length} != ${LB_FRAME_LEN}`);
@@ -97,32 +106,21 @@ export function buildLoadBankFrame(BufferTx: LoadBankFrame): Uint8Array {
 }
 
 
-
-export function parseLoadBankFrame(BufferRx: Uint8Array): LoadBankFrame | null {
-   if (BufferRx.length !== LB_FRAME_LEN) return null; 
-   const expectedCrc = crc8LoadBank(BufferRx);  
-   if (BufferRx[LB_FRAME_LEN - 1] !== expectedCrc) return null;
-
-   const version = BufferRx[0];
-   const bankPower = bytesToU16(BufferRx[1], BufferRx[2]);
-   const bankNo = BufferRx[3];
-   const bankHealth = BufferRx[4];
-   const contactorsMask = bytesToU16(BufferRx[5], BufferRx[6]);
-   const errContactors = bytesToU16(BufferRx[7], BufferRx[8]);
-   const errFans = bytesToU16(BufferRx[9], BufferRx[10]);
-   const errThermals = bytesToU16(BufferRx[11], BufferRx[12]);
-   const otherErrors = BufferRx[13];
+export function parseLoadBankFrame(rx: Uint8Array): LoadBankFrame | null {
+   if (rx.length !== LB_FRAME_LEN) return null;
+   const expectedCrc = crc8LoadBank(rx);
+   if (rx[LB_FRAME_LEN - 1] !== expectedCrc) return null;
 
    return {
-      version,
-      bankPower,
-      bankNo,
-      bankHealth,
-      contactorsMask,
-      errContactors,
-      errFans,
-      errThermals,
-      otherErrors,
+      version: rx[0],
+      bankPower: bytesToU16(rx[1], rx[2]),
+      bankNo: rx[3],
+      bankHealth: rx[4],
+      contactorsMask: bytesToU16(rx[5], rx[6]),
+      errContactors: bytesToU16(rx[7], rx[8]),
+      errFans: bytesToU16(rx[9], rx[10]),
+      errThermals: bytesToU16(rx[11], rx[12]),
+      otherErrors: rx[13],
    };
 }
 
@@ -154,9 +152,14 @@ export function findFirstLoadBankFrame(raw: number[] | Uint8Array): {
 
 
 
+// -----------------------------------------------------------------------------
+// Runtime polling manager
+// NOTE: backend runtime is SINGLE-OWNER of the serial port.
+// This TS wrapper enforces a single active session (auto OR fixed) at a time.
+// -----------------------------------------------------------------------------
 
 
-/* ---------- runtime polling manager (optimized) ---------- */
+/* ---------- runtime polling manager ---------- */
 type StatusCb = (s: LoadBankStatus) => void;
 type HealthCb = (h: LoadBankHealth) => void;
 type RxCb = (chunk: Uint8Array) => void;
@@ -189,14 +192,15 @@ let activeKey: SessionKey | null = null;
 const lastStatusByPort = new Map<string, LoadBankStatus>();
 const lastHealthByPort = new Map<string, LoadBankHealth>();
 
+
+
+
 function keyOf(portName: string, baud: number): SessionKey {
    return `${portName}:${baud}`;
 }
-
-
-
-
-
+function normalizePortName(portName?: string | null): string {
+   return (portName ?? "").trim();
+}
 
 export function getLastLoadBankStatus(portName: string): LoadBankStatus | undefined {
    return lastStatusByPort.get(portName);
@@ -241,16 +245,17 @@ async function ensureSingleActiveSession(nextKey: SessionKey): Promise<void> {
 
 
 export async function startLoadBankPolling(
-   portName: string,
+   portName: string | null,
    onStatus: StatusCb,
-   baud?: number,
+   baud?: number = DEV_ECHO_BAUD,
    abortSignal?: AbortSignal,
    onHealth?: HealthCb,
    onRx?: RxCb,
    onTx?: TxCb
 ): Promise<() => Promise<void>> {
+   const pn = normalizePortName(portName);
    const baudFinal = baud ?? DEV_ECHO_BAUD;
-   const key = keyOf(portName, baudFinal);
+   const key = keyOf(pn, baudFinal);
    let session = sessions.get(key);
    await ensureSingleActiveSession(key);
 
@@ -268,7 +273,7 @@ export async function startLoadBankPolling(
       activeKey = key;
 
       // start backend runtime ONLY once! (After absolutely smashing all others with ensureSingleActiveSession)
-      await invoke("lb_start_polling", { portName, baud });
+      await invoke("lb_start_polling", { portName: pn, baud });
 
       // single event listeners per session
       session.unlistenStatus = await listen<LoadBankStatus>("lb/status", (e) => {
@@ -284,7 +289,7 @@ export async function startLoadBankPolling(
       });
 
       // Raw stream chunks (for terminal/debug views)
-      session.unlistenRx = await listen<{ portName: string; bytes: number[] }>("lb/rx", (e) => {
+      session.unlistenRx = await listen<SerialRxChunk>("lb/rx", (e) => {
          const payload = e.payload;
          if (payload.portName !== portName) return;
          if (session!.rxCbs.size === 0) return;
@@ -292,7 +297,7 @@ export async function startLoadBankPolling(
          for (const cb of session!.rxCbs) cb(chunk);
       });
       // TX frames (write + optional polling)
-      session.unlistenTx = await listen<{ portName: string; bytes: number[] }>("lb/tx", (e) => {
+      session.unlistenTx = await listen<SerialTxChunk>("lb/tx", (e) => {
          const payload = e.payload;
          if (payload.portName !== portName) return;
          if (session!.txCbs.size === 0) return;
@@ -366,18 +371,57 @@ export async function lbWriteBytes(frame: Uint8Array) {
 
 
 export async function lbSetPolling(
-   enabled: boolean, 
-   intervalMs: number,
-   frame: Uint8Array
+   //enabled: boolean, 
+   everyMs: number,//intervalMs: number,
+   frame: Uint8Array | null
 ) {
    await invoke("lb_set_polling", {
-      enabled,
-      intervalMs,
-      frame: Array.from(frame),
+      //enabled,
+      everyMs,//intervalMs,
+      //frame: Array.from(frame),
+      frame: frame ? Array.from(frame) : null
    });
 }
 
 
+// -----------------------------------------------------------------------------
+// Utilities
+// -----------------------------------------------------------------------------
+
+/**
+ * Attach a simple console logger for rx/tx chunks.
+ * Returns an async stop() to remove the logger.
+ */
+export async function startCommConsoleTap(opts?: {
+   portName?: string | null;
+   baud?: number;
+   direction?: "rx" | "tx" | "both";
+}): Promise<() => Promise<void>> {
+   const dir = opts?.direction ?? "both";
+   const baud = opts?.baud ?? DEV_ECHO_BAUD;
+   const portName = opts?.portName ?? null;
+
+   const ac = new AbortController();
+
+   const stop = await startLoadBankPolling(
+      portName,
+      () => {},
+      ac.signal,
+      baud,
+      () => {},
+      dir === "rx" || dir === "both"
+         ? (c) => console.log(`[LB/RX ${c.portName}]`, c.hex)
+         : undefined,
+      dir === "tx" || dir === "both"
+         ? (c) => console.log(`[LB/TX ${c.portName}]`, c.hex)
+         : undefined
+   );
+
+   return async () => {
+      ac.abort();
+      await stop().catch(() => {});
+   };
+}
 
 export async function waitForLoadBankMask(
    portName: string,

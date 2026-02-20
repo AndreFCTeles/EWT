@@ -4,6 +4,27 @@ import { Unit } from "./checklistTypes";
 /* ──────────────────────────────────────────────────────────────────────────────
    Load bank protocol constants
 ────────────────────────────────────────────────────────────────────────────── */
+/**
+ * Wire frame length (NO START/STOP encoding):
+ *  - 14 bytes payload + 1 byte CRC8 = 15 bytes total
+ *
+ * Payload layout (indexes):
+ *  0  version (u8)
+ *  1  bankPower_hi
+ *  2  bankPower_lo
+ *  3  bankNo (u8)
+ *  3  bankHealth (u8)
+ *  5  contactorsMask_hi
+ *  6  contactorsMask_lo
+ *  7  errContactors_hi
+ *  8  errContactors_lo
+ *  9  errFans_hi
+ *  10 errFans_lo
+ *  11 errThermals_hi
+ *  12 errThermals_lo
+ *  13 otherErrors (u8)
+ *  14 crc8 (u8)
+ */
 export const LB_FRAME_LEN = 15;
 //export const LB_START = 0x01;
 //export const LB_STOP = 0x00;
@@ -80,6 +101,19 @@ export type LoadBankHealth = {
    reason?: string | null;
 };
 
+// new stuff - reflects rust
+export type SerialRxChunk = {
+   portName: string;
+   bytes: number[];
+   hex: string;
+};
+export type SerialTxChunk = {
+   portName: string;
+   bytes: number[];
+   hex: string;
+};
+
+
 export type LoadBankFrame = {
    version: number;  
    bankPower: number;   
@@ -121,7 +155,10 @@ export interface SerialParams {
    readTimeoutMs?: number;
    writeTimeoutMs?: number;
 }
-export enum CrcKind { CRC8='CRC8', CRC16='CRC16' }
+export enum CrcKind { 
+   CRC8='CRC8', 
+   CRC16='CRC16' 
+}
 export interface FrameConfig {
    sof: number;
    esc?: number|null;

@@ -14,6 +14,31 @@ pub struct LoadBankRuntimeState {
     inner: Mutex<Option<RuntimeHandle>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum RunMode {
+    /// Keep trying to open a specific port (and recover if it disappears).
+    Fixed(String),
+    /// Periodically scan ports, adopt the first one that yields a valid frame.
+    Auto,
+}
+
+impl RunMode {
+    fn from_port_name(port_name: &str) -> Self {
+        if port_name.trim().is_empty() {
+            RunMode::Auto
+        } else {
+            RunMode::Fixed(port_name.trim().to_string())
+        }
+    }
+
+    fn key(&self) -> String {
+        match self {
+            RunMode::Auto => "auto".to_string(),
+            RunMode::Fixed(p) => format!("fixed:{p}"),
+        }
+    }
+}
+
 struct RuntimeHandle {
     port_name: String,
     baud: u32,
@@ -25,14 +50,14 @@ enum RuntimeCmd {
     Write(Vec<u8>),
     Stop,
 }
- */
+*/
 
 enum RuntimeCmd {
     Write(Vec<u8>),
     SetPolling {
-        enabled: bool,
-        interval_ms: u64,
-        frame: Vec<u8>,
+        //enabled: bool,
+        every_ms: u64,          // interval_ms: u64,
+        frame: Option<Vec<u8>>, //frame: Vec<u8>,
     },
     Stop,
 }
@@ -64,6 +89,8 @@ pub struct LoadBankStatus {
     pub err_fans: u16,
     pub err_thermals: u16,
     pub other_errors: u8,
+    /// Optional: raw frame bytes as hex for debugging.
+    pub raw_frame_hex: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -80,6 +107,7 @@ pub struct LoadBankHealth {
 pub struct SerialRxChunk {
     pub port_name: String,
     pub bytes: Vec<u8>,
+    pub hex: String,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -87,6 +115,7 @@ pub struct SerialRxChunk {
 pub struct SerialTxChunk {
     pub port_name: String,
     pub bytes: Vec<u8>,
+    pub hex: String,
 }
 
 // -------------------- Protocol constants --------------------
@@ -151,6 +180,8 @@ fn parse_frame(frame: &[u8], port_name: &str) -> Option<LoadBankStatus> {
         err_fans: u16_to_bytes(frame[9], frame[10]),
         err_thermals: u16_to_bytes(frame[11], frame[12]),
         other_errors: frame[13],
+        // OPTIONAL FULL RAW
+        raw_frame_hex: to_hex(frame),
     })
 }
 
@@ -161,11 +192,12 @@ fn find_first_valid_status(
     //Option<(Vec<u8>, LoadBankStatus)> {
     //Option<LoadBankStatus> {
 
+    /*
     if buf.len() < LB_FRAME_LEN {
         return None;
     }
+    */
 
-    /*
     let mut i = 0usize;
     while i + LB_FRAME_LEN <= buf.len() {
         let slice = &buf[i..i + LB_FRAME_LEN];
@@ -174,23 +206,16 @@ fn find_first_valid_status(
             return Some((i, status)); //Some(status);
         }
         i += 1;
-    } */
-
+    }
+    /*
     let max_i = buf.len() - LB_FRAME_LEN;
     for i in 0..=max_i {
         let slice = &buf[i..i + LB_FRAME_LEN];
-        /*
-        if let Some(status) = parse_frame(slice, port_name) {
-            let frame = slice.to_vec();
-            // "buffer draining" = discard everything we've consumed so far.
-            buf.drain(0..i + LB_FRAME_LEN);
-            return Some((frame, status));
-        }
-        */
         if let Some(status) = parse_frame(slice, port_name) {
             return Some((i, status));
         }
     }
+    */
 
     // prevent infinite growth if garbage is arriving
     /*
@@ -265,6 +290,8 @@ pub fn lb_start_polling(
     port_name: String,
     baud: u32,
 ) -> Result<(), String> {
+    let requested_mode = RunMode::from_port_name(&port_name);
+
     // --- idempotent: if already running on same port+baud, do nothing ---
     {
         let guard = state.inner.lock().unwrap();
@@ -276,21 +303,24 @@ pub fn lb_start_polling(
     }
 
     // --- if running but on different port/baud, stop and restart ---
-    if let Some(old) = state.inner.lock().unwrap().take() {
-        stop_handle(old);
-    }
-    /*
     let old = state.inner.lock().unwrap().take();
     if let Some(h) = old {
         stop_handle(h);
-    }*/
+    }
+    /*
+    if let Some(old) = state.inner.lock().unwrap().take() {
+        stop_handle(old);
+    }
+    */
 
     let (tx, rx) = mpsc::channel::<RuntimeCmd>();
     let app2 = app.clone();
     let port_name2 = port_name.clone();
+    let mode2 = requested_mode.clone();
 
     let join = thread::spawn(move || {
         // open port INSIDE worker so it owns it
+        /* OLD WAY OF CHECKING PORTS AND PORT HEALTH
         let mut port = match serialport::new(&port_name2, baud)
             .timeout(Duration::from_millis(20))
             .open()
@@ -311,26 +341,200 @@ pub fn lb_start_polling(
         };
 
         eprintln!("[LB/RUNTIME] opened {} @ {}", &port_name2, baud);
+        */
 
         let offline_after = Duration::from_millis(800);
+        let scan_every = Duration::from_millis(500);
+        let probe_window = Duration::from_millis(250);
+
         let mut online = false;
         let mut last_seen = Instant::now();
+        let mut last_scan = Instant::now() - scan_every;
+
+        let mut active_port_name = String::new();
+        let mut port: Option<Box<dyn serialport::SerialPort>> = None;
 
         let mut buf: Vec<u8> = Vec::with_capacity(2048); //(4096); - ?
         let mut tmp = [0u8; 512]; //[0u8; 256];
 
         // optional polling (off by default)
-        let mut poll_enabled = false;
-        let mut poll_interval = Duration::from_millis(200);
-        let mut poll_frame: Vec<u8> = vec![];
+        //let mut poll_enabled = false;
+        let mut poll_every = Duration::from_millis(0); //let mut poll_interval = Duration::from_millis(200);
+        let mut poll_frame: Option<Vec<u8>> = None; //let mut poll_frame: Vec<u8> = vec![]; // = poll_enabled = false ?
         let mut last_poll = Instant::now();
 
         // throttle raw rx emission - (so we don’t spam UI -- will probably just be deleted later)
-        let mut rx_batch: Vec<u8> = Vec::with_capacity(1024);
-        let mut last_rx_emit = Instant::now();
+        //let mut rx_batch: Vec<u8> = Vec::with_capacity(1024);
+        //let mut last_rx_emit = Instant::now();
+
+        // helper: emit health
+        let emit_health = |app: &AppHandle,
+                           port_name: &str,
+                           online: bool,
+                           last_seen: &Instant,
+                           reason: Option<String>| {
+            let _ = app.emit(
+                "lb/health",
+                LoadBankHealth {
+                    port_name: port_name.to_string(),
+                    online,
+                    last_seen_ms: last_seen.elapsed().as_millis(),
+                    reason,
+                },
+            );
+        };
+
+        // helper: drop port + mark offline
+        let mut drop_port = |reason: &str| {
+            if online {
+                online = false;
+                emit_health(
+                    &app2,
+                    &active_port_name,
+                    false,
+                    &last_seen,
+                    Some(reason.to_string()),
+                );
+            }
+            port = None;
+            active_port_name.clear();
+            buf.clear();
+        };
+
+        // helper: send TX + emit event
+        let mut write_bytes = |bytes: &[u8]| {
+            if let Some(p) = port.as_mut() {
+                if p.write_all(bytes).is_ok() {
+                    let _ = p.flush();
+                    let _ = app2.emit(
+                        "lb/tx",
+                        SerialTxChunk {
+                            port_name: active_port_name.clone(),
+                            bytes: bytes.to_vec(),
+                            hex: to_hex(bytes),
+                        },
+                    );
+                    eprintln!("[LB/RUNTIME] TX({}) {}", active_port_name, to_hex(bytes));
+                }
+            }
+        };
+
+        // helper: in AUTO mode, try to adopt a port that yields a valid frame
+        let mut try_adopt_auto_port = || -> bool {
+            if last_scan.elapsed() < scan_every {
+                return false;
+            }
+            last_scan = Instant::now();
+
+            let ports = match serialport::available_ports() {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("[LB/RUNTIME] available_ports failed: {e}");
+                    return false;
+                }
+            };
+
+            for pinfo in ports {
+                let candidate = pinfo.port_name;
+                // quick probe: open + maybe poll once + read for window
+                let mut p = match serialport::new(&candidate, baud)
+                    .timeout(Duration::from_millis(20))
+                    .open()
+                {
+                    Ok(p) => p,
+                    Err(_) => continue,
+                };
+
+                // optional: single poll write to encourage a reply (if configured)
+                if let Some(frame) = poll_frame.as_deref() {
+                    let _ = p.write_all(frame);
+                    let _ = p.flush();
+                }
+
+                let start = Instant::now();
+                let mut probe_buf: Vec<u8> = Vec::with_capacity(1024);
+                let mut probe_tmp = [0u8; 256];
+                while start.elapsed() < probe_window {
+                    match p.read(&mut probe_tmp) {
+                        Ok(n) if n > 0 => {
+                            probe_buf.extend_from_slice(&probe_tmp[..n]);
+                            if let Some((offset, status)) =
+                                find_first_valid_status(&probe_buf, &candidate)
+                            {
+                                // Adopt this port
+                                active_port_name = candidate.clone();
+                                port = Some(p);
+
+                                // Keep leftover bytes after the consumed frame
+                                let consume_to = offset + LB_FRAME_LEN;
+                                if consume_to < probe_buf.len() {
+                                    buf.extend_from_slice(&probe_buf[consume_to..]);
+                                }
+
+                                last_seen = Instant::now();
+                                online = true;
+                                emit_health(&app2, &active_port_name, true, &last_seen, None);
+                                let _ = app2.emit("lb/status", status);
+
+                                eprintln!("[LB/RUNTIME] adopted port {candidate}");
+                                return true;
+                            }
+
+                            if probe_buf.len() > 4096 {
+                                // prevent infinite growth
+                                let keep = 1024.min(probe_buf.len());
+                                probe_buf.drain(0..(probe_buf.len() - keep));
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+                        Err(_) => break,
+                    }
+                }
+            }
+            false
+        };
+
+        // helper: in FIXED mode, try to open/reopen configured port
+        let mut try_open_fixed_port = |fixed_port: &str| -> bool {
+            if last_scan.elapsed() < scan_every {
+                return false;
+            }
+            last_scan = Instant::now();
+
+            match serialport::new(fixed_port, baud)
+                .timeout(Duration::from_millis(20))
+                .open()
+            {
+                Ok(p) => {
+                    active_port_name = fixed_port.to_string();
+                    port = Some(p);
+                    last_seen = Instant::now();
+                    emit_health(
+                        &app2,
+                        &active_port_name,
+                        false,
+                        &last_seen,
+                        Some("connected (awaiting frames)".into()),
+                    );
+                    true
+                }
+                Err(e) => {
+                    emit_health(
+                        &app2,
+                        fixed_port,
+                        false,
+                        &last_seen,
+                        Some(format!("open failed: {e}")),
+                    );
+                    false
+                }
+            }
+        };
 
         loop {
             // process queued commands (writes / stop)
+            /*
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
                     RuntimeCmd::Write(bytes) => {
@@ -370,9 +574,28 @@ pub fn lb_start_polling(
                         return;
                     }
                 }
+            } */
+
+            // process queued commands (writes / polling config / stop)
+            while let Ok(cmd) = rx.try_recv() {
+                match cmd {
+                    RuntimeCmd::Write(bytes) => {
+                        write_bytes(&bytes);
+                    }
+                    RuntimeCmd::SetPolling { frame, every_ms } => {
+                        poll_frame = frame;
+                        poll_every = Duration::from_millis(every_ms);
+                        last_poll = Instant::now();
+                    }
+                    RuntimeCmd::Stop => {
+                        eprintln!("[LB/RUNTIME] stop requested");
+                        return;
+                    }
+                }
             }
 
             // periodic poll (optional)
+            /*
             if poll_enabled && last_poll.elapsed() >= poll_interval {
                 last_poll = Instant::now();
                 if !poll_frame.is_empty() {
@@ -388,8 +611,36 @@ pub fn lb_start_polling(
                     let _ = port.flush();
                 }
             }
+            */
+
+            // ensure we have an open port (depending on mode)
+            if port.is_none() {
+                match &mode2 {
+                    RunMode::Auto => {
+                        let _ = try_adopt_auto_port();
+                    }
+                    RunMode::Fixed(p) => {
+                        let _ = try_open_fixed_port(p);
+                    }
+                }
+
+                // If still none, avoid busy-looping
+                if port.is_none() {
+                    thread::sleep(Duration::from_millis(50));
+                    continue;
+                }
+            }
+
+            // poll write (if configured)
+            if poll_every.as_millis() > 0 && last_poll.elapsed() >= poll_every {
+                if let Some(frame) = poll_frame.as_deref() {
+                    write_bytes(frame);
+                }
+                last_poll = Instant::now();
+            }
 
             // read
+            /*
             match port.read(&mut tmp) {
                 Ok(n) if n > 0 => {
                     buf.extend_from_slice(&tmp[..n]);
@@ -409,8 +660,38 @@ pub fn lb_start_polling(
                     );
                     return;
                 }
-            }
+            } */
 
+            // read chunk
+            let read_res = {
+                let p = port.as_mut().unwrap();
+                p.read(&mut tmp)
+            };
+
+            match read_res {
+                Ok(n) if n > 0 => {
+                    let chunk = tmp[..n].to_vec();
+                    buf.extend_from_slice(&chunk);
+
+                    let _ = app2.emit(
+                        "lb/rx",
+                        SerialRxChunk {
+                            port_name: active_port_name.clone(),
+                            bytes: chunk.clone(),
+                            hex: to_hex(&chunk),
+                        },
+                    );
+                    eprintln!("[LB/RUNTIME] RX({}) {}", active_port_name, to_hex(&chunk));
+                }
+                Ok(_) => {}
+                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(e) => {
+                    eprintln!("[LB/RUNTIME] read error on {}: {e}", active_port_name);
+                    drop_port(&format!("read error: {e}"));
+                    continue;
+                }
+            }
+            /*
             // raw rx chunk emission (optional; useful for “terminal” later)
             if !rx_batch.is_empty() && last_rx_emit.elapsed() >= Duration::from_millis(50) {
                 let chunk = std::mem::take(&mut rx_batch);
@@ -423,10 +704,11 @@ pub fn lb_start_polling(
                     },
                 );
                 last_rx_emit = Instant::now();
-            }
+            } */
 
             // emit all valid frames found
-            while let Some((offset, status)) = find_first_valid_status(&buf, &port_name2) {
+            while let Some((offset, status)) = find_first_valid_status(&buf, &port_name) {
+                // &port_name2) {
                 //while let Some((frame, status)) = find_first_valid_status(&buf, &port_name2) {
                 //find_first_valid_status(&mut buf, &port_name2) {
                 /* // drop any leading garbage (later: treat as debug text if you want) // Too much garbage collection, I assume?
@@ -436,17 +718,26 @@ pub fn lb_start_polling(
                     // now frame starts at 0
                     let frame: Vec<u8> = buf.drain(0..LB_FRAME_LEN).collect();
                 */
+                /*
                 let end = offset + LB_FRAME_LEN;
                 if end > buf.len() {
                     break;
                 }
 
                 let frame: Vec<u8> = buf[offset..end].to_vec();
-                buf.drain(0..end);
+                buf.drain(0..end); */
+                let consume_to = offset + LB_FRAME_LEN;
+                if consume_to <= buf.len() {
+                    buf.drain(0..consume_to);
+                } else {
+                    // should not happen, but never panic
+                    buf.clear();
+                }
 
                 last_seen = Instant::now();
                 if !online {
                     online = true;
+                    /*
                     let _ = app2.emit(
                         "lb/health",
                         LoadBankHealth {
@@ -455,16 +746,18 @@ pub fn lb_start_polling(
                             last_seen_ms: 0,
                             reason: None,
                         },
-                    );
+                    ); */
+                    emit_health(&app2, &active_port_name, true, &last_seen, None);
                 }
                 // log + emit status
-                eprintln!("[LB/RUNTIME] status frame: {}", to_hex(&frame));
+                //eprintln!("[LB/RUNTIME] status frame: {}", to_hex(&frame));
                 let _ = app2.emit("lb/status", status);
             }
 
             // offline detection
             if online && last_seen.elapsed() > offline_after {
                 online = false;
+                /*
                 let _ = app2.emit(
                     "lb/health",
                     LoadBankHealth {
@@ -473,6 +766,13 @@ pub fn lb_start_polling(
                         last_seen_ms: last_seen.elapsed().as_millis(),
                         reason: Some("no valid frames".into()),
                     },
+                ); */
+                emit_health(
+                    &app2,
+                    &active_port_name,
+                    false,
+                    &last_seen,
+                    Some("no valid frames".into()),
                 );
             }
 
@@ -498,6 +798,11 @@ pub fn lb_start_polling(
         tx,
         join,
     });
+    eprintln!(
+        "[LB/RUNTIME] started mode={} baud={}",
+        requested_mode.key(),
+        baud
+    );
     Ok(())
 }
 
@@ -521,15 +826,16 @@ pub fn lb_write_bytes(state: State<LoadBankRuntimeState>, data: Vec<u8>) -> Resu
 #[tauri::command]
 pub fn lb_set_polling(
     state: State<LoadBankRuntimeState>,
-    enabled: bool,
-    interval_ms: u64,
-    frame: Vec<u8>,
+    //enabled: bool,
+    every_ms: u64,          //interval_ms: u64,
+    frame: Option<Vec<u8>>, //frame: Vec<u8>,
 ) -> Result<(), String> {
     let guard = state.inner.lock().unwrap();
     let h = guard.as_ref().ok_or("Load bank polling not running")?;
     h.tx.send(RuntimeCmd::SetPolling {
-        enabled,
-        interval_ms,
+        //enabled,
+        //interval_ms,
+        every_ms,
         frame,
     })
     .map_err(|_| "runtime channel closed".to_string())

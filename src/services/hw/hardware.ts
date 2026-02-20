@@ -333,7 +333,7 @@ async function probePortForStatus(
          version: 1,
          bankPower: 600,
          bankNo: 1,
-         bankHealth: 0,
+         bankHealth: 0, // SUPPOSED TO SEND 0, RECEIVE FF
          contactorsMask: 0,
          errContactors: 0,
          errFans: 0,
@@ -356,75 +356,3 @@ async function probePortForStatus(
       if (stop) await stop().catch(() => {});
    }
 }
-
-
-/*
-async function probePortForStatus(
-   portName: string, 
-   baud: number, 
-   timeoutMs = 400
-): Promise<LoadBankStatus | null> {
-   const ac = new AbortController();
-*/
-
-   // OLD
-   /*
-   let stop: null | (() => Promise<void>) = null;
-
-   try {
-      const status = await new Promise<LoadBankStatus | null>((resolve) => {
-         const timer = window.setTimeout(() => resolve(null), timeoutMs);
-
-         startLoadBankPolling(
-            portName,
-            (s) => { 
-               clearTimeout(timer); 
-               resolve(s); },
-            baud,
-            ac.signal,
-            (_h: LoadBankHealth) => {}
-         ).then((fn) => { stop = fn; });
-      });
-
-      return status;
-   } finally {
-      ac.abort();
-      if (stop) await stop().catch(() => {});
-   }
-      */
-
-   
-   // NEW
-   /*
-   let timer: number | undefined;
-
-   // Resolve on first status or timeout
-   let resolve!: (v: LoadBankStatus | null) => void;
-   const p = new Promise<LoadBankStatus | null>((r) => (resolve = r));
-
-   const onStatus = (s: LoadBankStatus) => {
-      if (timer) window.clearTimeout(timer);
-      resolve(s);
-   };
-
-   // Start polling and immediately get stop handle (no race condition)
-   const stop = await startLoadBankPolling(
-      portName,
-      onStatus,
-      baud,
-      ac.signal,
-      (_h: LoadBankHealth) => {}
-   );
-
-   // Arm timeout after subscription is active
-   timer = window.setTimeout(() => resolve(null), timeoutMs);
-
-   try {
-      return await p;
-   } finally {
-      if (timer) window.clearTimeout(timer);
-      ac.abort(); // triggers stop too, but we also call stop() explicitly to be deterministic AND PEDANTIC also quite annoying
-      await stop().catch(() => {});
-   }
-}
-   */
