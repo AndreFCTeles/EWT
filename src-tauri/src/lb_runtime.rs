@@ -37,10 +37,18 @@ impl RunMode {
             RunMode::Fixed(p) => format!("fixed:{p}"),
         }
     }
+
+    fn fixed_port(&self) -> Option<&str> {
+        match self {
+            RunMode::Fixed(p) => Some(p.as_str()),
+            RunMode::Auto => None,
+        }
+    }
 }
 
 struct RuntimeHandle {
-    port_name: String,
+    //port_name: String,
+    mode_key: String,
     baud: u32,
     tx: mpsc::Sender<RuntimeCmd>,
     join: thread::JoinHandle<()>,
@@ -54,6 +62,9 @@ enum RuntimeCmd {
 
 enum RuntimeCmd {
     Write(Vec<u8>),
+    /// Configure polling:
+    /// - every_ms == 0 disables interval
+    /// - frame == None disables polling write (can still be used for AUTO probe if needed)
     SetPolling {
         //enabled: bool,
         every_ms: u64,          // interval_ms: u64,
@@ -139,12 +150,17 @@ const CRC8_TABLE: [u8; 256] = [
     247, 182, 232, 10, 84, 215, 137, 107, 53,
 ];
 
-fn crc8_load_bank(frame: &[u8]) -> u8 {
+fn crc8_load_bank(frame: &[u8]) -> Option<u8> {
+    //u8 { <- if not frame.len() check
+    // may remove check for dev
+    if frame.len() < LB_FRAME_LEN {
+        return None;
+    }
     let mut crc: u8 = 0;
     for i in 0..LB_FRAME_LEN - 1 {
         crc = CRC8_TABLE[(crc ^ frame[i]) as usize];
     }
-    crc
+    Some(crc) // return only "crc" if return "u8" instead of option
 }
 fn u16_to_bytes(hi: u8, lo: u8) -> u16 {
     let encoded = ((hi as u16) << 8) | (lo as u16);
@@ -160,12 +176,16 @@ fn to_hex(data: &[u8]) -> String {
 }
 
 fn parse_frame(frame: &[u8], port_name: &str) -> Option<LoadBankStatus> {
-    /*
+    // check if this guard is intended, might prevent debug, might be necessary for prod
     if frame.len() != LB_FRAME_LEN {
-        // check if this guard is intended, might prevent debug, might be necessary for prod
         return None;
-    }*/
+    }
+    /*
     if frame[LB_FRAME_LEN - 1] != crc8_load_bank(frame) {
+        return None;
+    } */
+    let expected = crc8_load_bank(frame)?;
+    if frame[LB_FRAME_LEN - 1] != expected {
         return None;
     }
 
@@ -242,47 +262,353 @@ pub fn list_ports_detailed() -> Vec<SerialPortInfo> {
 
     ports
         .into_iter()
-        .map(|p| match p.port_type {
-            serialport::SerialPortType::UsbPort(info) => SerialPortInfo {
-                port_name: p.port_name,
-                port_type: "usb".into(),
-                vid: Some(info.vid),
-                pid: Some(info.pid),
-                serial_number: info.serial_number,
-                manufacturer: info.manufacturer,
-                product: info.product,
-            },
-            serialport::SerialPortType::BluetoothPort => SerialPortInfo {
-                port_name: p.port_name,
-                port_type: "bluetooth".into(),
-                vid: None,
-                pid: None,
-                serial_number: None,
-                manufacturer: None,
-                product: None,
-            },
-            serialport::SerialPortType::PciPort => SerialPortInfo {
-                port_name: p.port_name,
-                port_type: "pci".into(),
-                vid: None,
-                pid: None,
-                serial_number: None,
-                manufacturer: None,
-                product: None,
-            },
-            serialport::SerialPortType::Unknown => SerialPortInfo {
-                port_name: p.port_name,
-                port_type: "unknown".into(),
-                vid: None,
-                pid: None,
-                serial_number: None,
-                manufacturer: None,
-                product: None,
-            },
+        //.map(|p| match p.port_type {
+        .map(|p| {
+            let port_name = p.port_name;
+            match p.port_type {
+                serialport::SerialPortType::UsbPort(info) => SerialPortInfo {
+                    port_name, //: p.port_name,
+                    port_type: "usb".into(),
+                    vid: Some(info.vid),
+                    pid: Some(info.pid),
+                    serial_number: info.serial_number,
+                    manufacturer: info.manufacturer,
+                    product: info.product,
+                },
+                serialport::SerialPortType::BluetoothPort => SerialPortInfo {
+                    port_name, //: p.port_name,
+                    port_type: "bluetooth".into(),
+                    vid: None,
+                    pid: None,
+                    serial_number: None,
+                    manufacturer: None,
+                    product: None,
+                },
+                serialport::SerialPortType::PciPort => SerialPortInfo {
+                    port_name, //: p.port_name,
+                    port_type: "pci".into(),
+                    vid: None,
+                    pid: None,
+                    serial_number: None,
+                    manufacturer: None,
+                    product: None,
+                },
+                serialport::SerialPortType::Unknown => SerialPortInfo {
+                    port_name, //: p.port_name,
+                    port_type: "unknown".into(),
+                    vid: None,
+                    pid: None,
+                    serial_number: None,
+                    manufacturer: None,
+                    product: None,
+                },
+            }
         })
         .collect()
 }
 
+// -------------------- Worker --------------------
+
+struct Worker {
+    app: AppHandle,
+    baud: u32,
+    mode: RunMode,
+
+    offline_after: Duration,
+    scan_every: Duration,
+    probe_window: Duration,
+
+    online: bool,
+    last_seen: Instant,
+    last_scan: Instant,
+
+    active_port_name: String,
+    port: Option<Box<dyn serialport::SerialPort>>,
+
+    buf: Vec<u8>,
+    tmp: [u8; 512],
+
+    poll_every: Duration,
+    poll_frame: Option<Vec<u8>>,
+    last_poll: Instant,
+}
+
+impl Worker {
+    fn health_port_name(&self) -> &str {
+        if !self.active_port_name.is_empty() {
+            &self.active_port_name
+        } else if let Some(p) = self.mode.fixed_port() {
+            p
+        } else {
+            "(auto)"
+        }
+    }
+
+    fn emit_health(&self, online: bool, reason: Option<String>) {
+        let _ = self.app.emit(
+            "lb/health",
+            LoadBankHealth {
+                port_name: self.health_port_name().to_string(),
+                online,
+                last_seen_ms: self.last_seen.elapsed().as_millis(),
+                reason,
+            },
+        );
+    }
+
+    fn drop_port(&mut self, reason: &str) {
+        if self.port.is_some() || self.online {
+            self.emit_health(false, Some(reason.to_string()));
+        }
+        self.online = false;
+        self.port = None;
+        self.active_port_name.clear();
+        self.buf.clear();
+    }
+
+    fn write_bytes(&mut self, bytes: &[u8]) {
+        let Some(p) = self.port.as_mut() else { return };
+
+        if p.write_all(bytes).is_ok() {
+            let _ = p.flush();
+            let _ = self.app.emit(
+                "lb/tx",
+                SerialTxChunk {
+                    port_name: self.health_port_name().to_string(),
+                    bytes: bytes.to_vec(),
+                    hex: to_hex(bytes),
+                },
+            );
+            eprintln!(
+                "[LB/RUNTIME] TX({}) {}",
+                self.health_port_name(),
+                to_hex(bytes)
+            );
+        }
+    }
+
+    fn ensure_port_open(&mut self) {
+        if self.port.is_some() {
+            return;
+        }
+
+        match self.mode.clone() {
+            RunMode::Auto => {
+                let _ = self.try_adopt_auto_port();
+            }
+            RunMode::Fixed(p) => {
+                let _ = self.try_open_fixed_port(&p);
+            }
+        }
+    }
+
+    fn try_open_fixed_port(&mut self, fixed_port: &str) -> bool {
+        if self.last_scan.elapsed() < self.scan_every {
+            return false;
+        }
+        self.last_scan = Instant::now();
+
+        match serialport::new(fixed_port, self.baud)
+            .timeout(Duration::from_millis(20))
+            .open()
+        {
+            Ok(p) => {
+                self.active_port_name = fixed_port.to_string();
+                self.port = Some(p);
+                self.last_seen = Instant::now();
+                self.emit_health(false, Some("connected (awaiting frames)".into()));
+                eprintln!(
+                    "[LB/RUNTIME] opened fixed port {} @ {}",
+                    fixed_port, self.baud
+                );
+                true
+            }
+            Err(e) => {
+                self.emit_health(false, Some(format!("open failed: {e}")));
+                false
+            }
+        }
+    }
+
+    fn try_adopt_auto_port(&mut self) -> bool {
+        if self.last_scan.elapsed() < self.scan_every {
+            return false;
+        }
+        self.last_scan = Instant::now();
+
+        let probe_frame = self.poll_frame.clone();
+
+        let ports = match serialport::available_ports() {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[LB/RUNTIME] available_ports failed: {e}");
+                return false;
+            }
+        };
+
+        for pinfo in ports {
+            let candidate = pinfo.port_name;
+
+            let mut p = match serialport::new(&candidate, self.baud)
+                .timeout(Duration::from_millis(20))
+                .open()
+            {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            // Optional: send one poll to encourage a reply (if configured)
+            if let Some(frame) = probe_frame.as_deref() {
+                let _ = p.write_all(frame);
+                let _ = p.flush();
+                eprintln!("[LB/RUNTIME] TX(PROBE:{}) {}", candidate, to_hex(frame));
+            }
+
+            let start = Instant::now();
+            let mut probe_buf: Vec<u8> = Vec::with_capacity(1024);
+            let mut probe_tmp = [0u8; 256];
+
+            while start.elapsed() < self.probe_window {
+                match p.read(&mut probe_tmp) {
+                    Ok(n) if n > 0 => {
+                        probe_buf.extend_from_slice(&probe_tmp[..n]);
+
+                        if let Some((offset, status)) =
+                            find_first_valid_status(&probe_buf, &candidate)
+                        {
+                            self.active_port_name = candidate.clone();
+                            self.port = Some(p);
+
+                            // Keep leftovers after the consumed frame
+                            let consume_to = offset + LB_FRAME_LEN;
+                            if consume_to < probe_buf.len() {
+                                self.buf.extend_from_slice(&probe_buf[consume_to..]);
+                            }
+
+                            self.last_seen = Instant::now();
+                            self.online = true;
+                            self.emit_health(true, None);
+                            let _ = self.app.emit("lb/status", status);
+
+                            eprintln!("[LB/RUNTIME] adopted port {}", candidate);
+                            return true;
+                        }
+
+                        if probe_buf.len() > 4096 {
+                            let keep = 1024.min(probe_buf.len());
+                            probe_buf.drain(0..(probe_buf.len() - keep));
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+                    Err(_) => break,
+                }
+            }
+        }
+
+        false
+    }
+
+    fn poll_if_due(&mut self) {
+        if self.poll_every.as_millis() == 0 {
+            return;
+        }
+        /*
+        if self.last_poll.elapsed() >= self.poll_every {
+            if let Some(frame) = self.poll_frame.as_deref() {
+                self.write_bytes(frame);
+            }
+            self.last_poll = Instant::now();
+        } */
+        if self.last_poll.elapsed() < self.poll_every {
+            return;
+        }
+
+        // Copy out of self so we can call &mut self methods safely
+        let frame = self.poll_frame.clone(); // Option<Vec<u8>>
+        if let Some(f) = frame {
+            self.write_bytes(&f);
+        }
+    }
+
+    fn read_once(&mut self) {
+        let Some(p) = self.port.as_mut() else { return };
+
+        match p.read(&mut self.tmp) {
+            Ok(n) if n > 0 => {
+                let chunk = &self.tmp[..n];
+                self.buf.extend_from_slice(chunk);
+
+                let _ = self.app.emit(
+                    "lb/rx",
+                    SerialRxChunk {
+                        port_name: self.health_port_name().to_string(),
+                        bytes: chunk.to_vec(),
+                        hex: to_hex(chunk),
+                    },
+                );
+                eprintln!(
+                    "[LB/RUNTIME] RX({}) {}",
+                    self.health_port_name(),
+                    to_hex(chunk)
+                );
+            }
+            Ok(_) => {}
+            Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(e) => {
+                eprintln!(
+                    "[LB/RUNTIME] read error on {}: {e}",
+                    self.health_port_name()
+                );
+                self.drop_port(&format!("read error: {e}"));
+            }
+        }
+    }
+
+    fn parse_frames(&mut self) {
+        // IMPORTANT: parse using the ACTIVE port name (not the command argument)
+        while !self.active_port_name.is_empty() {
+            let Some((offset, status)) = find_first_valid_status(&self.buf, &self.active_port_name)
+            else {
+                break;
+            };
+
+            let consume_to = offset + LB_FRAME_LEN;
+            if consume_to <= self.buf.len() {
+                self.buf.drain(0..consume_to);
+            } else {
+                // should never happen, but never panic
+                self.buf.clear();
+                break;
+            }
+
+            self.last_seen = Instant::now();
+            if !self.online {
+                self.online = true;
+                self.emit_health(true, None);
+            }
+            let _ = self.app.emit("lb/status", status);
+        }
+
+        // prevent unbounded growth if garbage arrives
+        const BUF_KEEP: usize = 2048;
+        if self.buf.len() > BUF_KEEP * 4 {
+            let drop = self.buf.len().saturating_sub(BUF_KEEP);
+            if drop > 0 {
+                self.buf.drain(0..drop);
+            }
+        }
+    }
+
+    fn offline_check(&mut self) {
+        if self.online && self.last_seen.elapsed() > self.offline_after {
+            // Policy: drop and re-open/re-scan depending on mode
+            self.drop_port("no valid frames");
+        }
+    }
+}
+
+// -------------------- Commands --------------------
 #[tauri::command]
 pub fn lb_start_polling(
     app: AppHandle,
@@ -291,301 +617,61 @@ pub fn lb_start_polling(
     baud: u32,
 ) -> Result<(), String> {
     let requested_mode = RunMode::from_port_name(&port_name);
+    let requested_key = requested_mode.key();
 
-    // --- idempotent: if already running on same port+baud, do nothing ---
+    // idempotent: already running same mode + baud
     {
         let guard = state.inner.lock().unwrap();
         if let Some(h) = guard.as_ref() {
-            if h.port_name == port_name && h.baud == baud {
+            if h.mode_key == requested_key && h.baud == baud {
                 return Ok(());
             }
         }
     }
 
-    // --- if running but on different port/baud, stop and restart ---
-    let old = state.inner.lock().unwrap().take();
-    if let Some(h) = old {
-        stop_handle(h);
-    }
-    /*
+    // stop old if different
     if let Some(old) = state.inner.lock().unwrap().take() {
         stop_handle(old);
     }
-    */
 
     let (tx, rx) = mpsc::channel::<RuntimeCmd>();
     let app2 = app.clone();
-    let port_name2 = port_name.clone();
     let mode2 = requested_mode.clone();
 
     let join = thread::spawn(move || {
-        // open port INSIDE worker so it owns it
-        /* OLD WAY OF CHECKING PORTS AND PORT HEALTH
-        let mut port = match serialport::new(&port_name2, baud)
-            .timeout(Duration::from_millis(20))
-            .open()
-        {
-            Ok(p) => p,
-            Err(e) => {
-                let _ = app2.emit(
-                    "lb/health",
-                    LoadBankHealth {
-                        port_name: port_name2.clone(),
-                        online: false,
-                        last_seen_ms: 0,
-                        reason: Some(format!("open failed: {e}")),
-                    },
-                );
-                return;
-            }
-        };
+        let mut w = Worker {
+            app: app2,
+            baud,
+            mode: mode2,
 
-        eprintln!("[LB/RUNTIME] opened {} @ {}", &port_name2, baud);
-        */
+            offline_after: Duration::from_millis(800),
+            scan_every: Duration::from_millis(500),
+            probe_window: Duration::from_millis(250),
 
-        let offline_after = Duration::from_millis(800);
-        let scan_every = Duration::from_millis(500);
-        let probe_window = Duration::from_millis(250);
+            online: false,
+            last_seen: Instant::now(),
+            last_scan: Instant::now() - Duration::from_millis(500),
 
-        let mut online = false;
-        let mut last_seen = Instant::now();
-        let mut last_scan = Instant::now() - scan_every;
+            active_port_name: String::new(),
+            port: None,
 
-        let mut active_port_name = String::new();
-        let mut port: Option<Box<dyn serialport::SerialPort>> = None;
+            buf: Vec::with_capacity(2048),
+            tmp: [0u8; 512],
 
-        let mut buf: Vec<u8> = Vec::with_capacity(2048); //(4096); - ?
-        let mut tmp = [0u8; 512]; //[0u8; 256];
-
-        // optional polling (off by default)
-        //let mut poll_enabled = false;
-        let mut poll_every = Duration::from_millis(0); //let mut poll_interval = Duration::from_millis(200);
-        let mut poll_frame: Option<Vec<u8>> = None; //let mut poll_frame: Vec<u8> = vec![]; // = poll_enabled = false ?
-        let mut last_poll = Instant::now();
-
-        // throttle raw rx emission - (so we don’t spam UI -- will probably just be deleted later)
-        //let mut rx_batch: Vec<u8> = Vec::with_capacity(1024);
-        //let mut last_rx_emit = Instant::now();
-
-        // helper: emit health
-        let emit_health = |app: &AppHandle,
-                           port_name: &str,
-                           online: bool,
-                           last_seen: &Instant,
-                           reason: Option<String>| {
-            let _ = app.emit(
-                "lb/health",
-                LoadBankHealth {
-                    port_name: port_name.to_string(),
-                    online,
-                    last_seen_ms: last_seen.elapsed().as_millis(),
-                    reason,
-                },
-            );
-        };
-
-        // helper: drop port + mark offline
-        let mut drop_port = |reason: &str| {
-            if online {
-                online = false;
-                emit_health(
-                    &app2,
-                    &active_port_name,
-                    false,
-                    &last_seen,
-                    Some(reason.to_string()),
-                );
-            }
-            port = None;
-            active_port_name.clear();
-            buf.clear();
-        };
-
-        // helper: send TX + emit event
-        let mut write_bytes = |bytes: &[u8]| {
-            if let Some(p) = port.as_mut() {
-                if p.write_all(bytes).is_ok() {
-                    let _ = p.flush();
-                    let _ = app2.emit(
-                        "lb/tx",
-                        SerialTxChunk {
-                            port_name: active_port_name.clone(),
-                            bytes: bytes.to_vec(),
-                            hex: to_hex(bytes),
-                        },
-                    );
-                    eprintln!("[LB/RUNTIME] TX({}) {}", active_port_name, to_hex(bytes));
-                }
-            }
-        };
-
-        // helper: in AUTO mode, try to adopt a port that yields a valid frame
-        let mut try_adopt_auto_port = || -> bool {
-            if last_scan.elapsed() < scan_every {
-                return false;
-            }
-            last_scan = Instant::now();
-
-            let ports = match serialport::available_ports() {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("[LB/RUNTIME] available_ports failed: {e}");
-                    return false;
-                }
-            };
-
-            for pinfo in ports {
-                let candidate = pinfo.port_name;
-                // quick probe: open + maybe poll once + read for window
-                let mut p = match serialport::new(&candidate, baud)
-                    .timeout(Duration::from_millis(20))
-                    .open()
-                {
-                    Ok(p) => p,
-                    Err(_) => continue,
-                };
-
-                // optional: single poll write to encourage a reply (if configured)
-                if let Some(frame) = poll_frame.as_deref() {
-                    let _ = p.write_all(frame);
-                    let _ = p.flush();
-                }
-
-                let start = Instant::now();
-                let mut probe_buf: Vec<u8> = Vec::with_capacity(1024);
-                let mut probe_tmp = [0u8; 256];
-                while start.elapsed() < probe_window {
-                    match p.read(&mut probe_tmp) {
-                        Ok(n) if n > 0 => {
-                            probe_buf.extend_from_slice(&probe_tmp[..n]);
-                            if let Some((offset, status)) =
-                                find_first_valid_status(&probe_buf, &candidate)
-                            {
-                                // Adopt this port
-                                active_port_name = candidate.clone();
-                                port = Some(p);
-
-                                // Keep leftover bytes after the consumed frame
-                                let consume_to = offset + LB_FRAME_LEN;
-                                if consume_to < probe_buf.len() {
-                                    buf.extend_from_slice(&probe_buf[consume_to..]);
-                                }
-
-                                last_seen = Instant::now();
-                                online = true;
-                                emit_health(&app2, &active_port_name, true, &last_seen, None);
-                                let _ = app2.emit("lb/status", status);
-
-                                eprintln!("[LB/RUNTIME] adopted port {candidate}");
-                                return true;
-                            }
-
-                            if probe_buf.len() > 4096 {
-                                // prevent infinite growth
-                                let keep = 1024.min(probe_buf.len());
-                                probe_buf.drain(0..(probe_buf.len() - keep));
-                            }
-                        }
-                        Ok(_) => {}
-                        Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
-                        Err(_) => break,
-                    }
-                }
-            }
-            false
-        };
-
-        // helper: in FIXED mode, try to open/reopen configured port
-        let mut try_open_fixed_port = |fixed_port: &str| -> bool {
-            if last_scan.elapsed() < scan_every {
-                return false;
-            }
-            last_scan = Instant::now();
-
-            match serialport::new(fixed_port, baud)
-                .timeout(Duration::from_millis(20))
-                .open()
-            {
-                Ok(p) => {
-                    active_port_name = fixed_port.to_string();
-                    port = Some(p);
-                    last_seen = Instant::now();
-                    emit_health(
-                        &app2,
-                        &active_port_name,
-                        false,
-                        &last_seen,
-                        Some("connected (awaiting frames)".into()),
-                    );
-                    true
-                }
-                Err(e) => {
-                    emit_health(
-                        &app2,
-                        fixed_port,
-                        false,
-                        &last_seen,
-                        Some(format!("open failed: {e}")),
-                    );
-                    false
-                }
-            }
+            poll_every: Duration::from_millis(0),
+            poll_frame: None,
+            last_poll: Instant::now(),
         };
 
         loop {
-            // process queued commands (writes / stop)
-            /*
+            // commands
             while let Ok(cmd) = rx.try_recv() {
                 match cmd {
-                    RuntimeCmd::Write(bytes) => {
-                        //let _ = port.write_all(&bytes);
-
-                        eprintln!("[LB/TX] {}", to_hex(&bytes));
-                        let _ = app2.emit(
-                            "lb/tx",
-                            SerialTxChunk {
-                                port_name: port_name2.clone(),
-                                bytes: bytes.clone(),
-                            },
-                        );
-                        if let Err(e) = port.write_all(&bytes) {
-                            eprintln!("[LB/RUNTIME] write error: {e}");
-                        }
-                        let _ = port.flush();
-                    }
-                    RuntimeCmd::SetPolling {
-                        enabled,
-                        interval_ms,
-                        frame,
-                    } => {
-                        poll_enabled = enabled;
-                        poll_interval = Duration::from_millis(interval_ms.max(10));
-                        poll_frame = frame;
-                        last_poll = Instant::now();
-                        eprintln!(
-                            "[LB/RUNTIME] polling {} interval={}ms frame_len={}",
-                            if poll_enabled { "ON" } else { "OFF" },
-                            poll_interval.as_millis(),
-                            poll_frame.len()
-                        );
-                    }
-                    RuntimeCmd::Stop => {
-                        eprintln!("[LB/RUNTIME] stopping {}", &port_name2);
-                        return;
-                    }
-                }
-            } */
-
-            // process queued commands (writes / polling config / stop)
-            while let Ok(cmd) = rx.try_recv() {
-                match cmd {
-                    RuntimeCmd::Write(bytes) => {
-                        write_bytes(&bytes);
-                    }
-                    RuntimeCmd::SetPolling { frame, every_ms } => {
-                        poll_frame = frame;
-                        poll_every = Duration::from_millis(every_ms);
-                        last_poll = Instant::now();
+                    RuntimeCmd::Write(bytes) => w.write_bytes(&bytes),
+                    RuntimeCmd::SetPolling { every_ms, frame } => {
+                        w.poll_frame = frame;
+                        w.poll_every = Duration::from_millis(every_ms);
+                        w.last_poll = Instant::now();
                     }
                     RuntimeCmd::Stop => {
                         eprintln!("[LB/RUNTIME] stop requested");
@@ -594,222 +680,40 @@ pub fn lb_start_polling(
                 }
             }
 
-            // periodic poll (optional)
-            /*
-            if poll_enabled && last_poll.elapsed() >= poll_interval {
-                last_poll = Instant::now();
-                if !poll_frame.is_empty() {
-                    eprintln!("[LB/TX/POLL] {}", to_hex(&poll_frame));
-                    let _ = app2.emit(
-                        "lb/tx",
-                        SerialTxChunk {
-                            port_name: port_name2.clone(),
-                            bytes: poll_frame.clone(),
-                        },
-                    );
-                    let _ = port.write_all(&poll_frame);
-                    let _ = port.flush();
-                }
-            }
-            */
-
-            // ensure we have an open port (depending on mode)
-            if port.is_none() {
-                match &mode2 {
-                    RunMode::Auto => {
-                        let _ = try_adopt_auto_port();
-                    }
-                    RunMode::Fixed(p) => {
-                        let _ = try_open_fixed_port(p);
-                    }
-                }
-
-                // If still none, avoid busy-looping
-                if port.is_none() {
-                    thread::sleep(Duration::from_millis(50));
-                    continue;
-                }
+            // ensure open (auto/fixed)
+            w.ensure_port_open();
+            if w.port.is_none() {
+                // avoid busy-looping
+                thread::sleep(Duration::from_millis(50));
+                continue;
             }
 
-            // poll write (if configured)
-            if poll_every.as_millis() > 0 && last_poll.elapsed() >= poll_every {
-                if let Some(frame) = poll_frame.as_deref() {
-                    write_bytes(frame);
-                }
-                last_poll = Instant::now();
-            }
-
-            // read
-            /*
-            match port.read(&mut tmp) {
-                Ok(n) if n > 0 => {
-                    buf.extend_from_slice(&tmp[..n]);
-                    rx_batch.extend_from_slice(&tmp[..n]);
-                } // buf.extend_from_slice(&tmp[..n]),
-                Ok(_) => {}
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
-                Err(e) => {
-                    let _ = app2.emit(
-                        "lb/health",
-                        LoadBankHealth {
-                            port_name: port_name2.clone(),
-                            online: false,
-                            last_seen_ms: last_seen.elapsed().as_millis(),
-                            reason: Some(format!("read error: {e}")),
-                        },
-                    );
-                    return;
-                }
-            } */
-
-            // read chunk
-            let read_res = {
-                let p = port.as_mut().unwrap();
-                p.read(&mut tmp)
-            };
-
-            match read_res {
-                Ok(n) if n > 0 => {
-                    let chunk = tmp[..n].to_vec();
-                    buf.extend_from_slice(&chunk);
-
-                    let _ = app2.emit(
-                        "lb/rx",
-                        SerialRxChunk {
-                            port_name: active_port_name.clone(),
-                            bytes: chunk.clone(),
-                            hex: to_hex(&chunk),
-                        },
-                    );
-                    eprintln!("[LB/RUNTIME] RX({}) {}", active_port_name, to_hex(&chunk));
-                }
-                Ok(_) => {}
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
-                Err(e) => {
-                    eprintln!("[LB/RUNTIME] read error on {}: {e}", active_port_name);
-                    drop_port(&format!("read error: {e}"));
-                    continue;
-                }
-            }
-            /*
-            // raw rx chunk emission (optional; useful for “terminal” later)
-            if !rx_batch.is_empty() && last_rx_emit.elapsed() >= Duration::from_millis(50) {
-                let chunk = std::mem::take(&mut rx_batch);
-                eprintln!("[LB/RX] {}", to_hex(&chunk));
-                let _ = app2.emit(
-                    "lb/rx",
-                    SerialRxChunk {
-                        port_name: port_name2.clone(),
-                        bytes: chunk,
-                    },
-                );
-                last_rx_emit = Instant::now();
-            } */
-
-            // emit all valid frames found
-            while let Some((offset, status)) = find_first_valid_status(&buf, &port_name) {
-                // &port_name2) {
-                //while let Some((frame, status)) = find_first_valid_status(&buf, &port_name2) {
-                //find_first_valid_status(&mut buf, &port_name2) {
-                /* // drop any leading garbage (later: treat as debug text if you want) // Too much garbage collection, I assume?
-                    if offset > 0 {
-                        buf.drain(0..offset);
-                    }
-                    // now frame starts at 0
-                    let frame: Vec<u8> = buf.drain(0..LB_FRAME_LEN).collect();
-                */
-                /*
-                let end = offset + LB_FRAME_LEN;
-                if end > buf.len() {
-                    break;
-                }
-
-                let frame: Vec<u8> = buf[offset..end].to_vec();
-                buf.drain(0..end); */
-                let consume_to = offset + LB_FRAME_LEN;
-                if consume_to <= buf.len() {
-                    buf.drain(0..consume_to);
-                } else {
-                    // should not happen, but never panic
-                    buf.clear();
-                }
-
-                last_seen = Instant::now();
-                if !online {
-                    online = true;
-                    /*
-                    let _ = app2.emit(
-                        "lb/health",
-                        LoadBankHealth {
-                            port_name: port_name2.clone(),
-                            online: true,
-                            last_seen_ms: 0,
-                            reason: None,
-                        },
-                    ); */
-                    emit_health(&app2, &active_port_name, true, &last_seen, None);
-                }
-                // log + emit status
-                //eprintln!("[LB/RUNTIME] status frame: {}", to_hex(&frame));
-                let _ = app2.emit("lb/status", status);
-            }
-
-            // offline detection
-            if online && last_seen.elapsed() > offline_after {
-                online = false;
-                /*
-                let _ = app2.emit(
-                    "lb/health",
-                    LoadBankHealth {
-                        port_name: port_name2.clone(),
-                        online: false,
-                        last_seen_ms: last_seen.elapsed().as_millis(),
-                        reason: Some("no valid frames".into()),
-                    },
-                ); */
-                emit_health(
-                    &app2,
-                    &active_port_name,
-                    false,
-                    &last_seen,
-                    Some("no valid frames".into()),
-                );
-            }
-
-            // prevent unbounded growth if garbage arrives
-            /*
-            if buf.len() > 8192 {
-                //8192
-                buf.drain(0..(buf.len() - 2048)); //2048
-            } */
-            const BUF_KEEP: usize = 2048;
-            if buf.len() > BUF_KEEP * 4 {
-                let drop = buf.len().saturating_sub(BUF_KEEP);
-                if drop > 0 {
-                    buf.drain(0..drop);
-                }
-            }
+            // poll + read + parse + offline check
+            w.poll_if_due();
+            w.read_once();
+            w.parse_frames();
+            w.offline_check();
         }
     });
 
     *state.inner.lock().unwrap() = Some(RuntimeHandle {
-        port_name,
+        mode_key: requested_key.clone(),
         baud,
         tx,
         join,
     });
-    eprintln!(
-        "[LB/RUNTIME] started mode={} baud={}",
-        requested_mode.key(),
-        baud
-    );
+
+    eprintln!("[LB/RUNTIME] started mode={} baud={}", requested_key, baud);
     Ok(())
 }
 
 #[tauri::command]
 pub fn lb_stop_polling(state: State<LoadBankRuntimeState>) -> Result<(), String> {
-    let old = state.inner.lock().unwrap().take();
+    /*let old = state.inner.lock().unwrap().take();
     if let Some(h) = old {
+        stop_handle(h);
+    }*/
+    if let Some(h) = state.inner.lock().unwrap().take() {
         stop_handle(h);
     }
     Ok(())

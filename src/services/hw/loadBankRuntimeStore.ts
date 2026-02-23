@@ -1,6 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+//import { invoke } from "@tauri-apps/api/core";
 import type { LoadBankHealth, LoadBankStatus, LoadBankProbe } from "@/types/loadBankTypes";
-import { detectLoadBank } from "@/services/hw/hardware";
+//import { detectLoadBank } from "@/services/hw/hardware";
 import { startLoadBankPolling } from "@/services/hw/lbProtocol";
 import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
 
@@ -66,10 +66,10 @@ function emitIfChanged(next: State) {
 
 let stopPolling: null | (() => Promise<void>) = null;
 let stopAbort: null | (() => void) = null; // keep?
-
 let initInFlight: Promise<LoadBankProbe> | null = null;
-let autoDetectTimer: number | null = null;
-let lastPortsKey = "";
+
+//let autoDetectTimer: number | null = null;
+//let lastPortsKey = "";
 
 
 async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) {
@@ -104,7 +104,7 @@ async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) 
          emitIfChanged({
             ...state,
             phase: "connected",
-            //portName,
+            portName: s.portName,
             bankPower: s.bankPower,
             bankNo: s.bankNo,
             bankHealth: s.bankHealth,
@@ -126,6 +126,7 @@ async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) 
             portName: h.portName || state.portName,
             online: h.online,
             reason: h.reason ?? null,
+            lastHealth: h,
          });
       }
    );
@@ -165,8 +166,8 @@ export async function initLoadBankMonitoring(cfg?: {
          online: null 
       });
 
-      
-    await attachPollingAuto({ baud: cfg?.baud });
+
+      await attachPollingAuto({ baud: cfg?.baud });
       //const probe: LoadBankProbe = await detectLoadBank();
 
       // Wait for the first status frame (if any) within timeout.
@@ -178,13 +179,14 @@ export async function initLoadBankMonitoring(cfg?: {
             resolve({
                connected: true,
                portName: state.portName,
-               status: state.lastStatus ?? undefined,
+               status: state.portName ?? undefined,
                bank_power: state.bankPower,
                bank_no: state.bankNo,
                bank_health: state.bankHealth,
             });
             return true;
          }
+         
          if (Date.now() - start > timeoutMs) {
             resolve({ connected: false });
             return true;
@@ -194,13 +196,12 @@ export async function initLoadBankMonitoring(cfg?: {
 
          if (maybeResolve()) return;
 
-         const unsub = subscribeLB(() => {
-         if (maybeResolve()) unsub();
-         });
+         const unsub = subscribeLB(() => { if (maybeResolve()) unsub(); });
       });
 
       if (!probe.connected) {
          emitIfChanged({ 
+            ...state,
             phase: "offline", 
             portName: null, 
             online: false, 
@@ -209,6 +210,7 @@ export async function initLoadBankMonitoring(cfg?: {
          return probe;
       }
 
+      /* WAT DO
       emitIfChanged({
          phase: "connected",
          portName: probe.portName,
@@ -217,6 +219,7 @@ export async function initLoadBankMonitoring(cfg?: {
          bankNo: probe.bank_no,
          bankHealth: probe.bank_health,
       });
+      */
 
       //await attachPolling(probe.portName);
       return probe;
@@ -231,14 +234,20 @@ export async function initLoadBankMonitoring(cfg?: {
 
 /** Step mount (LBCalStep): force refresh/reconnect */
 export async function ensureLoadBankConnected() {
-   if (state.portName && state.online === true) return;
+   //if (state.portName && state.online === true) return;
+   if (state.phase === "connected" && state.portName) return;
    await initLoadBankMonitoring();
 }
 
 
 
 
-/** Start a lightweight port watcher to auto-detect newly plugged devices. Call once on app startup. */
+/** 
+ * Start a lightweight port watcher to auto-detect newly plugged devices. Call once on app startup. 
+ * Legacy API kept for compatibility.
+ * Hotplug is handled by Rust now, so this is a no-op wrapper.
+ */
+/*
 export function startLoadBankAutoDetect(cfg: { intervalMs?: number } = {}) {
    const intervalMs = cfg.intervalMs ?? 1500;
    if (autoDetectTimer) return () => stopLoadBankAutoDetect();
@@ -282,11 +291,37 @@ export function startLoadBankAutoDetect(cfg: { intervalMs?: number } = {}) {
 
    return () => stopLoadBankAutoDetect();
 }
+*/
+export function startLoadBankAutoDetect(_cfg: { intervalMs?: number } = {}) {
+   void initLoadBankMonitoring();
+   return () => stopLoadBankAutoDetect();
+}
+
 
 export function stopLoadBankAutoDetect() {
+  // nothing to stop; Rust owns hotplug scanning
+}
+
+/** Optional: stop the runtime explicitly (rarely needed) */
+//export async function stopLoadBankAutoDetect() {
+   /*
    if (autoDetectTimer) {
       clearInterval(autoDetectTimer);
       autoDetectTimer = null;
    }
+   */
+
+export async function stopLoadBankMonitoring() {
+   stopAbort?.();
+   stopAbort = null;
+   if (stopPolling) {
+      await stopPolling().catch(() => {});
+      stopPolling = null;
+   }
+   emitIfChanged({ 
+      phase: "idle", 
+      portName: null,
+      online: null 
+   });
 }
 

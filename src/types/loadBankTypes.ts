@@ -105,12 +105,12 @@ export type LoadBankHealth = {
 export type SerialRxChunk = {
    portName: string;
    bytes: number[];
-   hex: string;
+   hex: Uint8Array;
 };
 export type SerialTxChunk = {
    portName: string;
    bytes: number[];
-   hex: string;
+   hex: Uint8Array;
 };
 
 

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
 import { CRC8_TABLE, LB_FRAME_LEN} from "@/types/loadBankTypes";
 import type { 
    LoadBankStatus, 
@@ -62,6 +63,10 @@ function bytesToU16(hi: number, lo: number): number {
 
 
 
+// -----------------------------------------------------------------------------
+// Frame build/parse
+// -----------------------------------------------------------------------------
+
 export function buildLoadBankFrame(BufferTx: LoadBankFrame): Uint8Array {
    const frame = new Uint8Array(LB_FRAME_LEN);
 
@@ -72,10 +77,13 @@ export function buildLoadBankFrame(BufferTx: LoadBankFrame): Uint8Array {
    const [pHi, pLo] = u16ToBytes(BufferTx.bankPower);
    frame[1] = pHi;
    frame[2] = pLo;
+
    // bankId
    frame[3] = clampU8(BufferTx.bankNo);
+
    // Connecton Health
    frame[4] = clampU8(BufferTx.bankHealth);
+
    // contactors
    const [cHi, cLo] = u16ToBytes(BufferTx.contactorsMask);
    frame[5] = cHi;
@@ -133,7 +141,7 @@ export function parseLoadBankFrame(rx: Uint8Array): LoadBankFrame | null {
 
 export function findFirstLoadBankFrame(raw: number[] | Uint8Array): { 
    raw: Uint8Array; 
-   parsed: LoadBankFrame
+   parsed: LoadBankFrame | null
 } | null {
    const buf = raw instanceof Uint8Array ? raw : Uint8Array.from(raw);
    for (let i = 0; i + LB_FRAME_LEN <= buf.length; i++) {
@@ -169,7 +177,7 @@ type SessionKey = string; // `${portName}:${baud}`
 
 type Session = {
    key: SessionKey; // use sessionkey as identifier? Y tho?
-   portName: string;
+   portName: string; // "" means AUTO mode
    baud: number;
 
    statusCbs: Set<StatusCb>;
@@ -186,8 +194,9 @@ type Session = {
 };
 
 // cache
-const sessions = new Map<SessionKey, Session>();
-let activeKey: SessionKey | null = null;
+//const sessions = new Map<SessionKey, Session>();
+//let activeKey: SessionKey | null = null;
+let active: Session | null = null;
 
 const lastStatusByPort = new Map<string, LoadBankStatus>();
 const lastHealthByPort = new Map<string, LoadBankHealth>();
@@ -195,11 +204,11 @@ const lastHealthByPort = new Map<string, LoadBankHealth>();
 
 
 
-function keyOf(portName: string, baud: number): SessionKey {
-   return `${portName}:${baud}`;
-}
 function normalizePortName(portName?: string | null): string {
    return (portName ?? "").trim();
+}
+function keyOf(portName: string, baud: number){//: SessionKey {
+   return `${portName || "auto"}:${baud}`;
 }
 
 export function getLastLoadBankStatus(portName: string): LoadBankStatus | undefined {
@@ -211,6 +220,7 @@ export function getLastLoadBankHealth(portName: string): LoadBankHealth | undefi
 
 
 // DESTROY ALL SESSIONS MUAHAHA
+/*
 async function teardownSession(sess: Session, callBackendStop: boolean): Promise<void> {
    // stop once
    if (!sess.stopping) {
@@ -241,54 +251,95 @@ async function ensureSingleActiveSession(nextKey: SessionKey): Promise<void> {
    }
    activeKey = nextKey;
 }
+   */
 
 
 
 export async function startLoadBankPolling(
    portName: string | null,
    onStatus: StatusCb,
-   baud?: number = DEV_ECHO_BAUD,
+   baud: number = DEV_ECHO_BAUD,
    abortSignal?: AbortSignal,
    onHealth?: HealthCb,
    onRx?: RxCb,
    onTx?: TxCb
 ): Promise<() => Promise<void>> {
    const pn = normalizePortName(portName);
-   const baudFinal = baud ?? DEV_ECHO_BAUD;
-   const key = keyOf(pn, baudFinal);
-   let session = sessions.get(key);
-   await ensureSingleActiveSession(key);
+   const key = keyOf(pn, baud);
+   //let session = sessions.get(key);
+   //await ensureSingleActiveSession(key);
 
-   if (!session) {
-      session = {
+   // Enforce single runtime session.
+   // If caller asks for a different key (auto<->fixed or different port/baud), stop the previous.
+   if (active && active.key !== key) {
+      await stopSession(active).catch(() => {});
+      active = null;
+   }
+
+   //if (!session) {
+      //session = {
+      
+   if (!active) {
+      active = {
          key,
-         portName,
-         baud: baudFinal,
+         portName: pn,
+         baud,
          statusCbs: new Set(),
          healthCbs: new Set(),
          rxCbs: new Set(),
          txCbs: new Set(),
       };
-      sessions.set(key, session);
-      activeKey = key;
+      //sessions.set(key, session);
+      //activeKey = key;
 
       // start backend runtime ONLY once! (After absolutely smashing all others with ensureSingleActiveSession)
       await invoke("lb_start_polling", { portName: pn, baud });
 
       // single event listeners per session
+      /*
       session.unlistenStatus = await listen<LoadBankStatus>("lb/status", (e) => {
          const s = e.payload;
-         if (s.portName !== portName) return;
-         lastStatusByPort.set(portName, s);
-         for (const cb of session!.statusCbs) cb(s);
+         //if (s.portName !== portName) return;
+         if (!active) return;
+         // FIXED mode: ignore statuses from other ports.
+         if (active.portName && s.portName !== active.portName) return;
+         lastStatusByPort.set(s.portName, s);
+         //for (const cb of session!.statusCbs) cb(s);
+         for (const cb of active.statusCbs) cb(s);
+      });*/
+      
+      // Attach single event listeners for this runtime.
+      active.unlistenStatus = await listen<LoadBankStatus>("lb/status", (e) => {
+         const s = e.payload;
+         if (!active) return;
+
+         // FIXED mode: ignore statuses from other ports.
+         if (active.portName && s.portName !== active.portName) return;
+
+         lastStatusByPort.set(s.portName, s);
+         for (const cb of active.statusCbs) cb(s);
       });
+
+      /*
       session.unlistenHealth = await listen<LoadBankHealth>("lb/health", (e) => {
          const h = e.payload;
          if (h.portName !== portName) return;
          for (const cb of session!.healthCbs) cb(h);
       });
+      */
+      active.unlistenHealth = await listen<LoadBankHealth>("lb/health", (e) => {
+         const h = e.payload;
+         if (!active) return;
+
+         // FIXED mode: ignore health from other ports.
+         if (active.portName && h.portName !== active.portName) return;
+
+         lastHealthByPort.set(h.portName, h);
+         for (const cb of active.healthCbs) cb(h);
+      });
 
       // Raw stream chunks (for terminal/debug views)
+      /*
       session.unlistenRx = await listen<SerialRxChunk>("lb/rx", (e) => {
          const payload = e.payload;
          if (payload.portName !== portName) return;
@@ -296,7 +347,15 @@ export async function startLoadBankPolling(
          const chunk = Uint8Array.from(payload.bytes);
          for (const cb of session!.rxCbs) cb(chunk);
       });
+      */
+      active.unlistenRx = await listen<SerialRxChunk>("lb/rx", (e) => {
+         const c = e.payload;
+         if (!active) return;
+         if (active.portName && c.portName !== active.portName) return;
+         for (const cb of active.rxCbs) cb(c.hex);
+      });
       // TX frames (write + optional polling)
+      /*
       session.unlistenTx = await listen<SerialTxChunk>("lb/tx", (e) => {
          const payload = e.payload;
          if (payload.portName !== portName) return;
@@ -304,13 +363,26 @@ export async function startLoadBankPolling(
          const frame = Uint8Array.from(payload.bytes);
          for (const cb of session!.txCbs) cb(frame);
       });
+      */
+      active.unlistenTx = await listen<SerialTxChunk>("lb/tx", (e) => {
+         const c = e.payload;
+         if (!active) return;
+         if (active.portName && c.portName !== active.portName) return;
+         for (const cb of active.txCbs) cb(c.hex);
+      });
    }
 
    // register subscriber - TODO: wtf is dis lmao
+   /*
    session.statusCbs.add(onStatus);
    if (onHealth) session.healthCbs.add(onHealth);
    if (onRx) session.rxCbs.add(onRx);
    if (onTx) session.txCbs.add(onTx);
+   */
+   active.statusCbs.add(onStatus);
+   if (onHealth) active.healthCbs.add(onHealth);
+   if (onRx) active.rxCbs.add(onRx);
+   if (onTx) active.txCbs.add(onTx);
 
    
    /*
@@ -339,30 +411,70 @@ export async function startLoadBankPolling(
    */
 
    // new STOP tears down all sessions
-   const stop = async (): Promise<void> => {
-      const s = sessions.get(key);
-      if (!s) return;
+   const stop = async () => {// (): Promise<void> => {
+      //const s = sessions.get(key);
+      //if (!s) return;
+      if (!active) return;
 
+      /*
       s.statusCbs.delete(onStatus);
       if (onHealth) s.healthCbs.delete(onHealth);
       if (onRx) s.rxCbs.delete(onRx);
       if (onTx) s.txCbs.delete(onTx);
+      */ 
+      active.statusCbs.delete(onStatus);
+      if (onHealth) active.healthCbs.delete(onHealth);
+      if (onRx) active.rxCbs.delete(onRx);
+      if (onTx) active.txCbs.delete(onTx);
 
-      // Keep backend running if someone is still listening.
-      if (s.statusCbs.size > 0 || s.healthCbs.size > 0 || s.rxCbs.size > 0 || s.txCbs.size > 0) return;
+      // Keep runtime alive if any listeners remain
+      /*
+      if (
+         s.statusCbs.size > 0 || 
+         s.healthCbs.size > 0 || 
+         s.rxCbs.size > 0 || s.txCbs.size > 0
+      ) return;
+      */
+      const stillUsed =
+         active.statusCbs.size > 0 ||
+         active.healthCbs.size > 0 ||
+         active.rxCbs.size > 0 ||
+         active.txCbs.size > 0;
+      if (stillUsed) return;
 
-      await teardownSession(s, true);
+      //await teardownSession(s, true);
+      const toStop = active;
+      active = null;
+      await stopSession(toStop).catch(() => {});
    };
 
-   if (abortSignal && abortSignal.aborted) {
-      await stop();
-      return stop;
+   if (abortSignal) {
+      if (abortSignal.aborted) {
+         await stop();
+         return stop;
+      }
+      abortSignal.addEventListener("abort", () => {
+         void stop();
+      }, { once: true });
    }
-   if (abortSignal && !abortSignal.aborted)
-   abortSignal.addEventListener("abort", () => { void stop(); }, { once: true });
 
    return stop;
 }
+
+async function stopSession(s: Session) {
+   if (!s.stopping) {
+      s.stopping = (async () => {
+         s.unlistenStatus?.();
+         s.unlistenHealth?.();
+         s.unlistenRx?.();
+         s.unlistenTx?.();
+         await invoke("lb_stop_polling").catch(() => {});
+      })();
+   }
+   await s.stopping;
+}
+
+
 
 export async function lbWriteBytes(frame: Uint8Array) {
    console.log("[LB/TX]", toHex(frame));
@@ -406,14 +518,14 @@ export async function startCommConsoleTap(opts?: {
    const stop = await startLoadBankPolling(
       portName,
       () => {},
-      ac.signal,
       baud,
+      ac.signal,
       () => {},
       dir === "rx" || dir === "both"
-         ? (c) => console.log(`[LB/RX ${c.portName}]`, c.hex)
+         ? (c) => console.log(`[LB/RX ${portName}]`, c)
          : undefined,
       dir === "tx" || dir === "both"
-         ? (c) => console.log(`[LB/TX ${c.portName}]`, c.hex)
+         ? (c) => console.log(`[LB/TX ${portName}]`, c)
          : undefined
    );
 
@@ -432,11 +544,13 @@ export async function waitForLoadBankMask(
 
    return new Promise((resolve, reject) => {
       const start = Date.now();
+      /*
       const keyCandidates = [...sessions.values()].filter(s => s.portName === portName);
       if (keyCandidates.length === 0) {
          reject(new Error(`[LB] waitForLoadBankMask called but no active polling session for ${portName}`));
          return;
       }
+      */
 
       let done = false;
       const tick = (s: LoadBankStatus) => {
@@ -455,17 +569,26 @@ export async function waitForLoadBankMask(
 
       // attach temporary subscriber to ALL sessions for this port
       const unsubscribers: Array<() => void> = [];
+      /*
       for (const sess of sessions.values()) {
          if (sess.portName !== portName) continue;
          sess.statusCbs.add(tick);
          unsubscribers.push(() => sess.statusCbs.delete(tick));
       }
+      */
+      if (!active) {
+         reject(new Error("[LB] waitForLoadBankMask called but polling is not running"));
+         return;
+      }
+
+      active.statusCbs.add(tick);
+      unsubscribers.push(() => active?.statusCbs.delete(tick));
 
       const timer = window.setTimeout(() => {
          if (done) return;
          done = true;
          cleanup();
-         const last = getLastLoadBankStatus(portName);
+         //const last = getLastLoadBankStatus(portName);
          reject(
             new Error(
                `[LB] timeout waiting for mask 0x${expectedMask.toString(16)} (last=0x${(last?.contactorsMask ?? 0).toString(16)})`
@@ -526,10 +649,10 @@ export async function attachConsoleTerminal(
 ): Promise<() => Promise<void>> {
    return startLoadBankPolling(
       portName,
-      () => {},
+      () => {}, // onStatus
       baud,
       abortSignal,
-      undefined,
+      undefined, // onHealth
       (chunk) => {
          // Hex + UTF-8-ish view
          const text = new TextDecoder("utf-8", { fatal: false }).decode(chunk);

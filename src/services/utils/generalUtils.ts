@@ -35,3 +35,11 @@ export const toHex = (bytes: number[] | Uint8Array): string => {
    const arr = bytes instanceof Uint8Array ? Array.from(bytes) : bytes;
    return arr.map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join(" ");
 }
+
+export function toHexBytes(bytes: ArrayLike<number>): string {
+   const parts: string[] = [];
+   for (let i = 0; i < bytes.length; i++) {
+      parts.push((bytes[i] ?? 0).toString(16).padStart(2, "0").toUpperCase());
+   }
+   return parts.join(" ");
+}

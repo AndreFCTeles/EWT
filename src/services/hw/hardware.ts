@@ -34,16 +34,17 @@ import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
  * Scans all COM ports.
  * Returns Probe { connected, hw_id, serial, portName? }.
  */
+/*
 export async function detectLoadBank(): Promise<LoadBankProbe> {
    console.log("[LB/HW] Probing load bank...");
 
    const portInfo = await invoke<SerialPortInfo[]>("list_ports_detailed");
    const ports = portInfo.map((p) => p.portName as string);
-   /*
+   
    const ports = portInfo.length
       ? portInfo.map((p) => p.portName as string)
       : await invoke<string[]>("list_ports");
-   */
+   
    console.log("[LB/HW] Available ports:", ports);
    const baud = DEV_ECHO_BAUD;
 
@@ -71,6 +72,70 @@ export async function detectLoadBank(): Promise<LoadBankProbe> {
 
    console.warn("[LB/HW] No load bank detected on any port");
    return { connected: false };
+}
+   */
+
+// ───────────────────────────────────────────────────────────────────────────────
+// LoadBank Probe (runtime-based, no separate debug port ownership)
+// ───────────────────────────────────────────────────────────────────────────────
+/**
+ * Starts/ensures the backend runtime in AUTO mode and waits briefly for the first
+ * valid LoadBankStatus.
+ *
+ * IMPORTANT:
+ * - Hotplug (newly connected devices) is handled on the Rust side.
+ * - This function is a short probe and does not own the serial port.
+ */
+export async function detectLoadBank(cfg?: {
+   timeoutMs?: number;
+   baud?: number;
+}): Promise<LoadBankProbe> {
+   const timeoutMs = cfg?.timeoutMs ?? DEV_ECHO_DELAY;
+   const baud = cfg?.baud ?? DEV_ECHO_BAUD;
+
+   console.log("[LB/HW] Probing load bank via runtime (AUTO)", { timeoutMs, baud });
+
+   const ac = new AbortController();
+   let stop: null | (() => Promise<void>) = null;
+
+   try {
+      const status = await new Promise<LoadBankStatus | null>((resolve) => {
+         const timer = window.setTimeout(() => resolve(null), timeoutMs);
+
+         // AUTO mode => portName null
+         startLoadBankPolling(
+            null,
+            (s) => {
+               clearTimeout(timer);
+               resolve(s);
+            },
+            baud,
+            ac.signal,
+            (_h: LoadBankHealth) => {}
+         ).then((fn) => {
+            stop = fn;
+         });
+      });
+
+      if (!status) {
+         console.warn("[LB/HW] No load bank detected within timeout (runtime stays active)");
+         return { connected: false };
+      }
+
+      console.log("[LB/HW] Load bank detected", status.portName, status);
+      return {
+         connected: true,
+         portName: status.portName,
+         status,
+         bank_power: status.bankPower,
+         bank_no: status.bankNo,
+         bank_health: status.bankHealth,
+      };
+   } finally {
+      // abort removes OUR probe listener; runtime may still be active elsewhere
+      ac.abort();
+      if (stop) await stop().catch(() => {});
+   }
 }
 
 
@@ -159,8 +224,12 @@ export async function applyLoadBankMaskSequence(opts: {
       });
       return newStatus;
    } catch (err) {
-      console.error("[LoadBank] Failed to apply mask 0x%s on %s: %o", 
-                  targetMask.toString(16), portName, err);
+      console.error(
+         "[LoadBank] Failed to apply mask 0x%s on %s: %o", 
+         targetMask.toString(16), 
+         portName, 
+         err
+      );
       // ensure all contactors off if the second step failed
       try {
          await setLoadBankContactors({
@@ -178,13 +247,51 @@ export async function applyLoadBankMaskSequence(opts: {
 // ───────────────────────────────────────────────────────────────────────────────
 // Check LB Status -- DEBUG
 // ───────────────────────────────────────────────────────────────────────────────
+/*
 export async function readLoadBankStatusOnce(portName: string, baud = DEV_ECHO_BAUD): Promise<LoadBankStatus | null> {
    const status = await probePortForStatus(portName, baud, DEV_ECHO_DELAY);
    if (!status) return null;
 
    return { ...status, portName };
 }
+*/
+// ───────────────────────────────────────────────────────────────────────────────
+// Check LB Status once (runtime-based)
+// ───────────────────────────────────────────────────────────────────────────────
+export async function readLoadBankStatusOnce(
+   portName: string,
+   baud = DEV_ECHO_BAUD,
+   timeoutMs = DEV_ECHO_DELAY
+): Promise<LoadBankStatus | null> {
+   const ac = new AbortController();
+   let stop: null | (() => Promise<void>) = null;
 
+   try {
+      const status = await new Promise<LoadBankStatus | null>((resolve) => {
+         const timer = window.setTimeout(() => resolve(null), timeoutMs);
+
+         // FIXED mode probe
+         startLoadBankPolling(
+            portName,
+            (s) => {
+               if (s.portName !== portName) return;
+               clearTimeout(timer);
+               resolve(s);
+            },
+            baud,
+            ac.signal,
+            () => {}
+         ).then((fn) => {
+            stop = fn;
+         });
+      });
+
+      return status;
+   } finally {
+      ac.abort();
+      if (stop) await stop().catch(() => {});
+   }
+}
 
 
 
@@ -294,8 +401,8 @@ export async function waitForSignal(
 // ───────────────────────────────────────────────────────────────────────────────
 // Utility: poll and wait for status
 // ───────────────────────────────────────────────────────────────────────────────
-
-
+// Currently unused
+/*
 async function probePortForStatus(
    portName: string,
    baud: number,
@@ -356,3 +463,4 @@ async function probePortForStatus(
       if (stop) await stop().catch(() => {});
    }
 }
+*/
