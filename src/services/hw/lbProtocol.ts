@@ -177,7 +177,7 @@ type SessionKey = string; // `${portName}:${baud}`
 
 type Session = {
    key: SessionKey; // use sessionkey as identifier? Y tho?
-   portName: string; // "" means AUTO mode
+   portName?: string; // "" means AUTO mode
    baud: number;
 
    statusCbs: Set<StatusCb>;
@@ -203,11 +203,12 @@ const lastHealthByPort = new Map<string, LoadBankHealth>();
 
 
 
-
+/*
 function normalizePortName(portName?: string | null): string {
    return (portName ?? "").trim();
 }
-function keyOf(portName: string, baud: number){//: SessionKey {
+   */
+function keyOf(portName: string | null, baud: number){//: SessionKey {
    return `${portName || "auto"}:${baud}`;
 }
 
@@ -256,7 +257,7 @@ async function ensureSingleActiveSession(nextKey: SessionKey): Promise<void> {
 
 
 export async function startLoadBankPolling(
-   portName: string | null,
+   portName: string,
    onStatus: StatusCb,
    baud: number = DEV_ECHO_BAUD,
    abortSignal?: AbortSignal,
@@ -264,8 +265,8 @@ export async function startLoadBankPolling(
    onRx?: RxCb,
    onTx?: TxCb
 ): Promise<() => Promise<void>> {
-   const pn = normalizePortName(portName);
-   const key = keyOf(pn, baud);
+   //const pn = normalizePortName(portName);
+   const key = keyOf(portName, baud);
    //let session = sessions.get(key);
    //await ensureSingleActiveSession(key);
 
@@ -282,7 +283,7 @@ export async function startLoadBankPolling(
    if (!active) {
       active = {
          key,
-         portName: pn,
+         portName,
          baud,
          statusCbs: new Set(),
          healthCbs: new Set(),
@@ -293,7 +294,7 @@ export async function startLoadBankPolling(
       //activeKey = key;
 
       // start backend runtime ONLY once! (After absolutely smashing all others with ensureSingleActiveSession)
-      await invoke("lb_start_polling", { portName: pn, baud });
+      await invoke("lb_start_polling", { portName, baud });
 
       // single event listeners per session
       /*
@@ -505,13 +506,13 @@ export async function lbSetPolling(
  * Returns an async stop() to remove the logger.
  */
 export async function startCommConsoleTap(opts?: {
-   portName?: string | null;
+   portName?: string;
    baud?: number;
    direction?: "rx" | "tx" | "both";
 }): Promise<() => Promise<void>> {
    const dir = opts?.direction ?? "both";
    const baud = opts?.baud ?? DEV_ECHO_BAUD;
-   const portName = opts?.portName ?? null;
+   const portName = opts?.portName ?? "";
 
    const ac = new AbortController();
 

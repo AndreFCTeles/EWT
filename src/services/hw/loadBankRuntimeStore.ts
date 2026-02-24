@@ -1,11 +1,15 @@
-//import { invoke } from "@tauri-apps/api/core";
-import type { LoadBankHealth, LoadBankStatus, LoadBankProbe } from "@/types/loadBankTypes";
+import { invoke } from "@tauri-apps/api/core";
+import type { LoadBankHealth, LoadBankStatus, LoadBankProbe, SerialPortInfo } from "@/types/loadBankTypes";
 //import { detectLoadBank } from "@/services/hw/hardware";
 import { startLoadBankPolling } from "@/services/hw/lbProtocol";
-import { DEV_ECHO_BAUD, DEV_ECHO_DELAY } from "@/dev/devConfig";
+import { 
+   DEV_ECHO_BAUD, 
+   //DEV_ECHO_DELAY 
+} from "@/dev/devConfig";
+//import { detectLoadBank } from "./hardware";
 
 type State = {
-   phase: "idle" | "probing" | "connected" | "offline";
+   phase: "idle" | "probing" | "monitoring" | "connected" | "offline";
    portName: string | null;
    online: boolean | null;           // null until first health result
    reason?: string | null;
@@ -22,18 +26,10 @@ type State = {
 let state: State = { 
    phase: "idle", 
    portName: null, 
-   online: null 
+   online: null, 
+   lastStatus: null,
 };
 const subs = new Set<() => void>();
-
-
-// STATE
-export function getLBState() { return state; }
-export function subscribeLB(fn: () => void) { 
-   subs.add(fn); 
-   return () => subs.delete(fn); 
-}
-
 
 // LOGGING 
 function emitIfChanged(next: State) {
@@ -45,19 +41,30 @@ function emitIfChanged(next: State) {
       state.bankPower === next.bankPower &&
       state.bankNo === next.bankNo &&
       state.bankHealth === next.bankHealth &&
-      state.hasErrors === next.hasErrors;
+      state.hasErrors === next.hasErrors &&
+      state.lastStatus === next.lastStatus;
 
-   //if (same) return;
-   
+   if (same) return;
+   /*
    if (same) {
       // still keep lastStatus/lastHealth fresh even if other fields equal
       state.lastStatus = next.lastStatus ?? state.lastStatus;
       state.lastHealth = next.lastHealth ?? state.lastHealth;
       return;
    }
+      */
    state = next;
    subs.forEach((fn) => fn());
 }
+
+// STATE
+export function getLBState() { return state; }
+export function subscribeLB(fn: () => void) { 
+   subs.add(fn); 
+   return () => subs.delete(fn); 
+}
+
+
 
 
 
@@ -67,31 +74,62 @@ function emitIfChanged(next: State) {
 let stopPolling: null | (() => Promise<void>) = null;
 let stopAbort: null | (() => void) = null; // keep?
 let initInFlight: Promise<LoadBankProbe> | null = null;
+//let abortCtl: AbortController | null = null;
 
 //let autoDetectTimer: number | null = null;
 //let lastPortsKey = "";
 
+function toProbeFromStatus(s: LoadBankStatus): LoadBankProbe {
+   return {
+      connected: true,
+      portName: s.portName,
+      status: s,
+      bank_power: s.bankPower,
+      bank_no: s.bankNo,
+      bank_health: s.bankHealth,
+   };
+}
 
-async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) {
-   /*
+/*
+async function attachPollingAuto(portName: string) {
    if (stopPolling) {
       await stopPolling().catch(() => {});
       stopPolling = null;
    }
+
    if (stopAbort) {
       stopAbort();
       stopAbort = null;
    }
-   */
+
    if (stopPolling) return;
 
-   const baud = cfg?.baud ?? DEV_ECHO_BAUD;
+   if (abortCtl) {
+      abortCtl.abort();
+      abortCtl = null;
+   }
+
+   abortCtl = new AbortController();
+   */
+
+   //const baud = cfg?.baud ?? DEV_ECHO_BAUD;
+   /*
    const ac = new AbortController();
    stopAbort = () => ac.abort();
 
    stopPolling = await startLoadBankPolling(
       //portName,
       null, // AUTO mode
+   const stopFn = await startLoadBankPolling(
+      portName,
+       */
+      
+async function attachAutoMonitoring() {
+   if (stopPolling) return;
+
+   // Start backend in AUTO mode by passing "" as portName.
+   stopPolling = await startLoadBankPolling(
+      "",
       (s: LoadBankStatus) => {
          const portChanged = state.portName !== s.portName;
          if (portChanged) {
@@ -104,7 +142,8 @@ async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) 
          emitIfChanged({
             ...state,
             phase: "connected",
-            portName: s.portName,
+            portName: s.portName,//portName, 
+            lastStatus: s,
             bankPower: s.bankPower,
             bankNo: s.bankNo,
             bankHealth: s.bankHealth,
@@ -114,23 +153,25 @@ async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) 
                s.errThermals || 
                s.otherErrors
             ),
-            lastStatus: s,
          });
       },
-      baud,//DEV_ECHO_BAUD,//undefined, // baud
-      ac.signal, // abortSignal
+      DEV_ECHO_BAUD,//DEV_ECHO_BAUD,//undefined, // baud
+      undefined,//abortCtl.signal,//ac.signal, // abortSignal
       (h: LoadBankHealth) => {
+         // In auto mode backend may emit "" while scanning.
+         const pname = h.portName || state.portName;
          emitIfChanged({
             ...state,
-            phase: h.online ? "connected" : "offline",
-            portName: h.portName || state.portName,
+            phase: h.online ? (pname ? "connected" : "monitoring") : "offline",
+            portName: pname ?? null,//portName, //portName: h.portName || state.portName,
             online: h.online,
             reason: h.reason ?? null,
-            lastHealth: h,
+            //lastHealth: h,
          });
       }
    );
 
+   /*
    const stopInner = stopPolling;
    stopPolling = async () => {
       ac.abort();
@@ -139,38 +180,79 @@ async function attachPollingAuto(cfg?: { baud?: number }) {//(portName: string) 
       stopPolling = null;
       stopAbort = null;
    };
+
+   stopPolling = async () => {
+      abortCtl?.abort();
+      await stopFn().catch(() => {});
+   };
+   */
+   emitIfChanged({
+      ...state,
+      phase: "monitoring",
+      online: null,
+      reason: null,
+   });
 }
 
 
 
 
 
-
-
-
-
-/** App mount: probe and start monitoring */
-export async function initLoadBankMonitoring(cfg?: { 
-   timeoutMs?: number; 
-   baud?: number 
-}) {//() {
+/** App boot: start backend auto monitoring. Never blocks UI. */
+export async function initLoadBankMonitoring(): Promise<LoadBankProbe> {
    if (initInFlight) return initInFlight;
 
-   
-   const timeoutMs = cfg?.timeoutMs ?? DEV_ECHO_DELAY;
+   initInFlight = (async () => {
+      await attachAutoMonitoring();
+
+      // If already connected from cached state, return it.
+      if (state.lastStatus && state.portName && state.phase === "connected") {
+         return toProbeFromStatus(state.lastStatus);
+      }
+
+      // Otherwise, return "connected:false" (monitoring continues in background).
+      return { connected: false } as LoadBankProbe;
+   })().finally(() => {
+      initInFlight = null;
+   });
+
+   return initInFlight;
+}
+
+
+
+/** App mount: probe and start monitoring 
+ *  export async function initLoadBankMonitoring(cfg?: { 
+ *    timeoutMs?: number; 
+ *    baud?: number 
+ * }) {//() {
+ */
+
+/**
+ * Probe once and, if found, attach polling.
+ * Safe to call multiple times; concurrent calls will share the same in-flight promise.
+ */
+/*
+export async function initLoadBankMonitoring(): Promise<LoadBankProbe> { 
+   if (initInFlight) return initInFlight;
+
+   //const timeoutMs = cfg?.timeoutMs ?? DEV_ECHO_DELAY;
 
    initInFlight = (async () => {
       emitIfChanged({ 
          phase: "probing", 
          portName: null, 
-         online: null 
+         online: null, 
+         lastStatus: null 
       });
 
 
-      await attachPollingAuto({ baud: cfg?.baud });
-      //const probe: LoadBankProbe = await detectLoadBank();
+      //await attachPollingAuto({ baud: cfg?.baud });
+      const probe: LoadBankProbe = await detectLoadBank();
+*/
 
       // Wait for the first status frame (if any) within timeout.
+      /*
       const probe = await new Promise<LoadBankProbe>((resolve) => {
          const start = Date.now();
 
@@ -198,7 +280,9 @@ export async function initLoadBankMonitoring(cfg?: {
 
          const unsub = subscribeLB(() => { if (maybeResolve()) unsub(); });
       });
+      */
 
+      /*
       if (!probe.connected) {
          emitIfChanged({ 
             ...state,
@@ -206,11 +290,14 @@ export async function initLoadBankMonitoring(cfg?: {
             portName: null, 
             online: false, 
             reason: "not found yet (runtime scanning)",
+            lastStatus: null,
          });
          return probe;
       }
+         */
 
-      /* WAT DO
+      /* WAT DO */
+      /*
       emitIfChanged({
          phase: "connected",
          portName: probe.portName,
@@ -218,24 +305,22 @@ export async function initLoadBankMonitoring(cfg?: {
          bankPower: probe.bank_power,
          bankNo: probe.bank_no,
          bankHealth: probe.bank_health,
+         lastStatus: probe.status,
       });
-      */
 
-      //await attachPolling(probe.portName);
+      await attachPollingAuto(probe.portName);
       return probe;
    })();
 
-   try {
-      return await initInFlight;
-   } finally {
-      initInFlight = null;
-   }
+   try { return await initInFlight; } 
+   finally { initInFlight = null; }
 }
+   */
 
 /** Step mount (LBCalStep): force refresh/reconnect */
 export async function ensureLoadBankConnected() {
-   //if (state.portName && state.online === true) return;
-   if (state.phase === "connected" && state.portName) return;
+   if (state.portName && state.online === true) return;
+   //if (state.phase === "connected" && state.portName) return;
    await initLoadBankMonitoring();
 }
 
@@ -292,10 +377,57 @@ export function startLoadBankAutoDetect(cfg: { intervalMs?: number } = {}) {
    return () => stopLoadBankAutoDetect();
 }
 */
+
+
+// ---------------- Hot-plug helper (optional) ----------------
+// NOTE: this is intentionally lightweight; it should not block UI.
+
+let autoDetectTimer: number | null = null;
+let lastPortsKey = "";
+
+/**
+ * Watch port changes and re-probe only when offline.
+ * If you move hot-plug to Rust later, you can delete this without affecting the rest of the app.
+ */
+export function startLoadBankAutoDetect(cfg: { intervalMs?: number } = {}) {
+   const intervalMs = cfg.intervalMs ?? 1500;
+   if (autoDetectTimer) return () => stopLoadBankAutoDetect();
+
+   const tick = async () => {
+      // only re-probe when we are not connected
+      const shouldProbe =
+         state.phase === "idle" ||
+         state.phase === "offline" ||
+         state.portName === null ||
+         state.online === false;
+
+      if (!shouldProbe) return;
+
+      try {
+         const portInfo = await invoke<SerialPortInfo[]>("list_ports_detailed");
+         const ports = portInfo.map((p) => p.portName);
+         const key = ports.join("|");
+         const changed = key !== lastPortsKey;
+         lastPortsKey = key;
+
+         if (changed) { void initLoadBankMonitoring(); }
+      } catch {
+         // ignore transient errors
+      }
+   };
+
+   autoDetectTimer = window.setInterval(() => void tick(), intervalMs);
+   void tick();
+
+   return () => stopLoadBankAutoDetect();
+}
+
+/*
 export function startLoadBankAutoDetect(_cfg: { intervalMs?: number } = {}) {
    void initLoadBankMonitoring();
    return () => stopLoadBankAutoDetect();
 }
+*/
 
 
 export function stopLoadBankAutoDetect() {

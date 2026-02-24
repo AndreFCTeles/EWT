@@ -102,9 +102,9 @@ export async function detectLoadBank(cfg?: {
       const status = await new Promise<LoadBankStatus | null>((resolve) => {
          const timer = window.setTimeout(() => resolve(null), timeoutMs);
 
-         // AUTO mode => portName null
+         // AUTO mode => portName = "" | null
          startLoadBankPolling(
-            null,
+            "", // ""
             (s) => {
                clearTimeout(timer);
                resolve(s);

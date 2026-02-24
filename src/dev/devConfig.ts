@@ -12,6 +12,7 @@ export const DEV_ECHO_PORT = "COM6";
 export const DEV_ECHO_POWER = 600;
 export const DEV_ECHO_DEBUG_BANK = true;
 export const DEV_ECHO_BANK_NO = 1;
+export const DEV_ECHO_CONNECTION_HEALTH = 0;
 export const DEV_ECHO_BAUD = 115200;
 export const DEV_ECHO_DELAY = 500;
 export const DEV_ECHO_COUNT = 4;

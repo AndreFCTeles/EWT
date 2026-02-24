@@ -235,7 +235,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
 } ) => {
    // min max inits
    const lb = useLoadBankRuntime();
-   const powers = lb.bankPower ? POWERS.filter((p) => p > lb!.bankPower!) : POWERS; 
+   const powers = lb.bankPower ? POWERS.filter((p) => p < lb!.bankPower!) : POWERS; 
    const process = submission?.vars?.selectedProcess;
    const minPowerVar = submission?.vars?.minPowerA ? submission.vars.minPowerA : 15
    const powerVar = submission?.vars?.powerA ? submission.vars.powerA : 600
