@@ -90,72 +90,32 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
 
             {/* Dyn option selectors */}
             <Box w={"30%"}>
+               <NumberInput
+               mb={"md"}
+               mx={"sm"}
+               label="Tensão de Vazio" />
 
-               {/*<Title order={2} ta={"center"} mb={0} pb={0}>Tensão de Vazio</Title>
-               <Flex
-               w={"100%"} 
-               pb={"xl"}
-               justify={'space-around'}>*/}
-                  <NumberInput
-                  mb={"md"}
-                  mx={"sm"}
-                  label="Tensão de Vazio" />
-               {/*</Flex>*/}
-
-               {/*<Title order={2} ta={"center"} mb={0} pb={0}>{
+               <NumberInput
+               mb={"md"}
+               mx={"sm"}
+               label={`${
                   selectedProcess === 'MIGInv' 
                   ? 'Tensão'
                   : 'Corrente'
-               } de Controlo</Title>
-               <Flex
-               w={"100%"} 
-               pb={"xl"}
-               justify={'space-around'}>*/}
-
-                  <NumberInput
-                  mb={"md"}
-                  mx={"sm"}
-                  label={`${
-                     selectedProcess === 'MIGInv' 
-                     ? 'Tensão'
-                     : 'Corrente'
-                  } de Controlo
-                  `} />
-               {/*</Flex>*/}
+               } de Controlo
+               `} />
 
                <Text ta={"center"} mb={0} pb={0}>Tensão de alimentação</Text>
 
-               {/*<SimpleGrid
-               w={"100%"} 
-               pt={0}
-               pb={"md"}
-               cols={3}
-               spacing={0}>
-                  <Stack 
-                  align='flex-end' 
-                  p={0} my={'auto'}
-                  ml={'auto'} mr={0} 
-                  gap={0}>
-                     <Text
-                     size={"xl"} 
-                     c={!phaseSwitch?"":"dimmed"}  
-                     m={0} p={0}
-                     >230V AC</Text>
-                     <Text 
-                     m={0} p={0} 
-                     fw={600} 
-                     size={"sm"} 
-                     c={"dimmed"}>(monofásica)</Text>
-                  </Stack>*/}
-
-                  <Flex mb={"md"}>
-                     <Switch 
-                     classNames={classes} 
-                     checked={phaseSwitch}
-                     onChange={(event) => setPhaseSwitch(event.currentTarget.checked)}
-                     m={"auto"}
-                     size={'xl'}
-                     onLabel={ <Stack gap={0} 
+               <Flex mb={"md"}>
+                  <Switch 
+                  classNames={classes} 
+                  checked={phaseSwitch}
+                  onChange={(event) => setPhaseSwitch(event.currentTarget.checked)}
+                  m={"auto"}
+                  size={'xl'}
+                  onLabel={ 
+                     <Stack gap={0} 
                         mr={0} pr={0}>
                         <Text
                         c={"#ffffff"}
@@ -165,8 +125,10 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
                         size={"sm"} 
                         c={"#adb5bd"}
                         >(trifásica)</Text>
-                     </Stack> }
-                     offLabel={ <Stack gap={0} >
+                     </Stack> 
+                  }
+                  offLabel={ 
+                     <Stack gap={0} >
                         <Text 
                         c={"#ffffff"}
                         >230V AC</Text>
@@ -175,27 +137,9 @@ export const PickProcessStep: React.FC<StepRuntimeProps> = ( {
                         size={"sm"} 
                         c={"#adb5bd"}
                         >(monofásica)</Text>
-                     </Stack> } />
-                  </Flex>
-
-                  {/*<Stack 
-                  align='flex-start'
-                  p={0} my={'auto'}
-                  mr={'auto'} ml={0} 
-                  gap={0}>
-                     <Text
-                     size={"xl"} 
-                     c={phaseSwitch?"":"dimmed"} 
-                     m={0} p={0}
-                     >400V AC</Text>
-                     <Text 
-                     m={0} p={0} 
-                     fw={600} 
-                     size={"sm"} 
-                     c={"dimmed"}>(trifásica)</Text>
-                  </Stack>
-               </SimpleGrid>*/}
-
+                     </Stack> 
+                  } />
+               </Flex>
 
                <Flex w={"100%"} mt={"sm"}>
                   <Stack w={"60%"} mx="auto">
@@ -237,7 +181,7 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
    const lb = useLoadBankRuntime();
    const powers = lb.bankPower ? POWERS.filter((p) => p < lb!.bankPower!) : POWERS; 
    const process = submission?.vars?.selectedProcess;
-   const minPowerVar = submission?.vars?.minPowerA ? submission.vars.minPowerA : 15
+   const minPowerVar = submission?.vars?.minPowerA ? submission.vars.minPowerA : 10
    const powerVar = submission?.vars?.powerA ? submission.vars.powerA : 600
    const [sliderMin, setSliderMin] = useState<number>(minPowerVar);
    const [sliderMax, setSliderMax] = useState<number>(powerVar);
@@ -379,7 +323,13 @@ export const PickPowerStep: React.FC<StepRuntimeProps> = ( {
 
 
 // ---- PickBrand ----
-export const PickBrandStep: React.FC<StepRuntimeProps> = ({ id, canGoBack, goBack, complete, submission }) => {
+export const PickBrandStep: React.FC<StepRuntimeProps> = ( { 
+   id, 
+   canGoBack, 
+   goBack, 
+   complete, 
+   submission 
+} ) => {
    const [brands, setBrands] = useState<string[]>([]);
    const [loading, setLoading] = useState(true);
 

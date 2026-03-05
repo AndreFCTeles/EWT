@@ -1,6 +1,6 @@
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
-import DevEchoPcbTest from '../../BU/DevEchoPcbTest';
+import DevEchoPcbTest from './DevEchoPcbTest';
 
 export const TestLBStep: React.FC<StepRuntimeProps> = ( { 
    canGoBack, 

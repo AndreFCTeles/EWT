@@ -12,7 +12,7 @@ export const ProcedurePickerStep: React.FC<StepRuntimeProps> = ( {
    complete 
 } ) => {
    if (!isActive) return;
-   const pick = (mode: 'validation' | 'calibration') =>
+   const pick = (mode: 'TFL' | 'VALCAL') =>
       complete(
          { 
             id, 
@@ -30,16 +30,12 @@ export const ProcedurePickerStep: React.FC<StepRuntimeProps> = ( {
          <Box className={classes.PPRoot}>
             <Button 
             className={classes.PPBtn} 
-            onClick={() => pick('validation')}
-            >Validações</Button>
+            onClick={() => pick('TFL')}
+            >Testes Fim de Linha</Button>
             <Button 
             className={classes.PPBtn} 
-            onClick={() => pick('calibration')}
-            >Calibrações</Button>
-            <Button 
-            className={classes.PPBtn} 
-            variant='outline'
-            >Fim de linha</Button>
+            onClick={() => pick('VALCAL')}
+            >Validações/Calibrações</Button>
          </Box>
       </StepShell>
    );

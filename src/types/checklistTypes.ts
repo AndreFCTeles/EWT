@@ -8,8 +8,10 @@ import type { Tol } from "./generalTypes";
 //GENERAL
 export type Process = 'MMA'|'TIG'|'MIGInv'|'MIGConv';
 export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGInv', 'MIGConv'];
+
 export type RatedCurrent = 200|250|300|350|400|500|600|1000;
 export const POWERS: RatedCurrent[] = [200, 250, 300, 350, 400, 500, 600, 1000];
+
 export type DeviceOrigin = 'db'|'manual'|'autodetect';
 export type Unit = 'V'|'A'|'Ω'|'°C'|'mV'|'mA'|'kΩ'|'%';
 export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
@@ -21,42 +23,72 @@ export type Verdict =
 
 
 
-// STEPS
-export type StepId =
+// STEPS - TODOS OS PASSOS
+export type StepId = // 
    'detectPowerBank'
    //| 'testLBStep' 
    | 'pickProcedure' 
-   | 'specs' //| 'dutSearch'
-   | 'pickProcess' | 'pickPower' | 'pickBrand'
-   //| 'dut' 
-   //| 'interlocks' | 'connections' | 'selftests' | 'calstatus'
-   | 'calibration' | 'ocv'
-   /*
-   | `proc:${Process}:nominals`
-   | `proc:${Process}:start`
-   | `proc:${Process}:sweep`
-   | `proc:${Process}:thermal`
-   | `proc:${'MIGInv' | 'TIG'}:pulse`
-   | `proc:${'MIGInv' | 'TIG'}:gas`
-   */
-   | 'summary' | 'export';
+   // | 'specs' 
+   // | 'dutSearch'
+   | 'pickProcess' 
+   | 'pickPower' 
+   | 'pickBrand'
+   // | 'dut' 
+   // | 'interlocks' 
+   // | 'connections' 
+   // | 'selftests' 
+   // | 'calstatus'
+   | 'calibration'
+   // | 'ocv'
+   | 'summary' 
+   | 'export';
 
-export const PIPELINE: StepId[] = [ // ordem
-   'detectPowerBank', 
-   //'testLBStep',
-   'pickProcedure',
-   'specs', // 'dutSearch',
-   'pickProcess', 'pickPower', 'pickBrand',
-   //'dut', 
-   //'interlocks', 'connections', 'selftests', 'calstatus',
-   'calibration','ocv',
-   /*
-   'proc:MIGInv:nominals', 'proc:MIGInv:start', 'proc:MIGInv:sweep', 'proc:MIGInv:pulse', 'proc:MIGInv:thermal', 'proc:MIGInv:gas',
-   'proc:TIG:nominals', 'proc:TIG:start', 'proc:TIG:sweep', 'proc:TIG:pulse', 'proc:TIG:thermal', 'proc:TIG:gas',
-   'proc:MMA:nominals', 'proc:MMA:start', 'proc:MMA:sweep', 'proc:MMA:thermal',
-   */
-   'summary', 'export'
-];
+
+// CHECKLISTS - APENAS ORDENS DOS PASSOS
+// Steps themselves are globally defined in StepRegistry.ts.
+export type ChecklistId = "VALCAL" | "TFL";
+export const DEFAULT_CHECKLIST: ChecklistId = "VALCAL";
+
+export const CHECKLISTS: Record<ChecklistId, StepId[]> = {
+   VALCAL: [
+      'detectPowerBank', 
+      //'testLBStep',
+      'pickProcedure',
+      // 'specs', 
+      // 'dutSearch',
+      'pickProcess',
+      'pickPower',
+      'pickBrand',
+      // 'dut', 
+      // 'interlocks', 
+      // 'connections', 
+      // 'selftests', 
+      // 'calstatus',
+      'calibration', 
+      // 'ocv',
+      'summary',
+      'export'
+   ],
+   TFL: [
+      "detectPowerBank",
+      //'testLBStep',
+      "pickProcedure",
+      // "specs",
+      // 'dutSearch',
+      "pickProcess",
+      "pickPower",
+      "pickBrand",
+      // 'dut', 
+      // 'interlocks', 
+      // 'connections', 
+      // 'selftests', 
+      // 'calstatus',
+      "calibration",
+      // "ocv",
+      "summary",
+      "export",
+   ]
+};
 
 
 export type StepRecord = {
@@ -78,7 +110,7 @@ export type StepRecord = {
 
 
 
-//REPORT
+// REPORT / DOMAIN
 export type ProductDoc = {
    _id?: string ;
    prodName: string;
@@ -161,15 +193,24 @@ export type Submission = {
    };
    steps: StepRecord[];
    vars?: {
+      // workflow flags / selections
+      mode?: ChecklistId;
       manualSelect?: boolean;
+
       selectedProcess?: Process;
       minPowerA?: number;
       powerA?: RatedCurrent;
       brand?: string;
       productData?: ProductData;
       dutPatchedManual?: boolean;
+
+      // runtime snapshots
+      loadBank?: any;
+
       [k: string]: any;
    };
    finalVerdict?: Verdict;
    reportId?: string;
+   generatedAt?: string;
+   version?: number;
 };

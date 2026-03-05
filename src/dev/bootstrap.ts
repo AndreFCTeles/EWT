@@ -34,5 +34,12 @@ export function getInitialSubmission(): Submission {
       },
       steps: [],
       //vars: manual ? { manualSelect: true } : {},  // supports your current boolean
+      vars: {
+         // optional sensible defaults; can be overridden by pickProcedure
+         mode: "TFL",
+         loadBank: null,
+         manualSelect: true,
+      },
+      version: 1,
    };
 }

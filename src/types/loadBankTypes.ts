@@ -55,6 +55,8 @@ export const CRC8_TABLE: number[] = [
    Load bank frames/status
 ────────────────────────────────────────────────────────────────────────────── */
 // ------ CONNECTION ------
+
+/*  OLD DEV/TEST TYPES
 export type Roundtrip = {
    sent_bytes: number[];
    recv_bytes: number[];
@@ -73,6 +75,8 @@ export type Probe = {
    serial?: string;
    portName?: string;
 };
+*/
+
 export type LoadBankProbe =
    | { connected: false }
    | {
@@ -81,7 +85,7 @@ export type LoadBankProbe =
          status: LoadBankStatus;
          bank_power: number;
          bank_no: number;
-         bank_health: number;
+         handshake: number;
       };
 
 export type SerialPortInfo = {
@@ -94,11 +98,8 @@ export type SerialPortInfo = {
    product?: string;
 };
 
-export type LoadBankHealth = {
-   portName: string;
-   online: boolean;
-   lastSeenMs: number;
-   reason?: string | null;
+export type PortsEvent = {
+   ports: string[];
 };
 
 // new stuff - reflects rust
@@ -119,7 +120,7 @@ export type LoadBankFrame = {
    bankPower: number;   
    bankNo: number;     
    
-   bankHealth: number;
+   handshake: number;
 
    contactorsMask: number; 
    errContactors: number;
@@ -131,6 +132,12 @@ export type LoadBankFrame = {
 export type LoadBankStatus = LoadBankFrame & {
    portName: string;
    rawFrameHex?: string;
+};
+export type LoadBankHealth = { // connection health
+   portName: string;
+   online: boolean;
+   lastSeenMs: number;
+   reason?: string | null;
 };
 export type LoadBankLive = {
    portName: string | null;

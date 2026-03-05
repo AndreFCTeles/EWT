@@ -39,23 +39,23 @@
    cursor: default;
 }
 
-.POWERStack {
+.CALStack {
    height: 100%;
 }
 
-.POWERBTN {
+.CALBTN {
    border-width: 2px;
    border-color: darkgrey;
    border-style: solid;
 }
 
-.POWER,
-.POWERLABEL {
+.CAL,
+.CALLABEL {
    font-size: 2rem;
    font-weight: 700;
 }
 
-.POWERLABEL {
+.CALLABEL {
    line-height: 100%;
 }
 

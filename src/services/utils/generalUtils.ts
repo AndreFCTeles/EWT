@@ -43,3 +43,9 @@ export function toHexBytes(bytes: ArrayLike<number>): string {
    }
    return parts.join(" ");
 }
+
+
+export const roundToNthDecimal = (num: number, n: number) => {
+   const factor = Math.pow(10, n);
+   return Math.round((num + Number.EPSILON) * factor) / factor;
+};

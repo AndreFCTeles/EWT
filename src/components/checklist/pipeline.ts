@@ -1,13 +1,10 @@
 import { setup, assign } from 'xstate';
 
-
-import { buildReport } from '@utils/report';
+import { buildReport as defaultBuildReport } from '@utils/report';
 import type { StepId, Submission, StepRecord } from '@/types/checklistTypes';
 import type { Role } from '@/types/generalTypes';
 
-
-
-import { nowIso } from '@/services/utils/generalUtils';
+//import { nowIso } from '@/services/utils/generalUtils';
 
 
 
@@ -44,6 +41,7 @@ export type StepRuntimeProps = {
 
 
 
+/*
 type ApplyEvt = { 
    type: 'APPLY'; 
    record: StepRecord; 
@@ -54,17 +52,31 @@ type CompleteEvt = {
    record: StepRecord; 
    patchVars?: Record<string, unknown> 
 };
-type JumpEvt = { 
-   type: 'JUMP'; 
-   to: StepId 
+*/
+
+type UpsertEvt = {
+   type: "UPSERT";
+   record: StepRecord;
+   patchVars?: Record<string, unknown>;
+   advance?: boolean;
 };
-type BackEvt = { 
-   type: 'BACK_TO'; 
-   to: StepId 
-}; // compute prev manual
-type AbortEvt = { 
-   type: 'ABORT'; 
-   reason: string 
+type JumpEvt = { type: 'JUMP'; to: StepId };
+type BackEvt = { type: 'BACK_TO'; to: StepId }; 
+type AbortEvt = { type: 'ABORT'; reason: string };
+
+export type ChecklistEvent = UpsertEvt | JumpEvt | BackEvt | AbortEvt; // ApplyEvt | CompleteEvt
+export type ChecklistContext = {
+   pipeline: StepId[];
+   idx: number;
+   submission: Submission;
+   summaryStepId: StepId;
+   buildReport: (s: Submission) => Submission;
+};
+export type ChecklistInput = {
+   pipeline: StepId[];                  // order used by the run (your STEP_ORDER/plan)
+   initialSubmission: Submission;       // initial submission object
+   buildReport?: (s: Submission) => Submission;
+   summaryStepId?: StepId;             // default "summary"
 };
 
 
@@ -73,6 +85,19 @@ type AbortEvt = {
 /* ---------- Submission Helpers (pure/immutable) ---------- */
 export const wasCompleted = (sub: Submission, id: StepId) => sub.steps.some((s) => s.id === id);
 
+const ROOT_KEYS = new Set<string>([
+   "dut",
+   "header",
+   "instruments",
+   "env",
+   "finalVerdict",
+   "generatedAt",
+   "version",
+   "reportId",
+   "steps",
+]);
+
+/*
 const shallowEqualKeys = (
    a: Record<string, unknown>, 
    b: Record<string, unknown>, 
@@ -81,7 +106,69 @@ const shallowEqualKeys = (
    for (const k of keys) if (a[k] !== b[k]) return false;
    return true;
 }
+*/
 
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+   !!v && typeof v === "object" && !Array.isArray(v);
+
+const deepMerge = (base: unknown, patch: unknown): unknown => {
+   if (!isPlainObject(base) || !isPlainObject(patch)) return patch ?? base;
+   const out: Record<string, unknown> = { ...base };
+   for (const [k, pv] of Object.entries(patch)) {
+      const bv = out[k];
+      if (isPlainObject(bv) && isPlainObject(pv)) out[k] = deepMerge(bv, pv);
+      else out[k] = pv;
+   }
+   return out;
+};
+
+const setIn = (obj: any, path: string[], value: unknown): any => {
+   if (!path.length) return value;
+   const [head, ...rest] = path;
+   const cur = obj ?? {};
+   // clone the current node (object)
+   return {
+      ...(isPlainObject(cur) ? cur : {}),
+      [head]: setIn(cur[head], rest, value),
+   };
+};
+
+const applyPatchVars = (sub: Submission, patchVars?: Record<string, unknown>) => {
+   if (!patchVars) return sub;
+
+   const varsPatch: Record<string, unknown> = {};
+   const rootReplace: Record<string, unknown> = {};
+   const dotPatches: Array<[string, unknown]> = [];
+
+   for (const [k, v] of Object.entries(patchVars)) {
+      if (k.includes(".")) dotPatches.push([k, v]);
+      else if (ROOT_KEYS.has(k)) rootReplace[k] = v;
+      else varsPatch[k] = v;
+   }
+
+   let next: Submission = sub;
+
+   // 1) varsPatch -> submission.vars (deep merge)
+   if (Object.keys(varsPatch).length) {
+      const mergedVars = deepMerge(next.vars ?? {}, varsPatch) as Record<string, unknown>;
+      next = { ...next, vars: mergedVars };
+   }
+
+   // 2) rootReplace -> submission root (replace)
+   if (Object.keys(rootReplace).length) {
+      next = { ...next, ...(rootReplace as any) };
+   }
+
+   // 3) dotPatches -> patch root via dot paths (supports "vars.*" too)
+   for (const [dot, value] of dotPatches) {
+      const parts = dot.split(".").filter(Boolean);
+      next = setIn(next as any, parts, value);
+   }
+
+   return next;
+};
+
+/*
 const upsertSubmission = (
    sub: Submission,
    record: StepRecord,
@@ -103,23 +190,28 @@ const upsertSubmission = (
 
    return { ...sub, steps, vars: nextVars, dut };
 }
+*/
 
+const upsertSubmission = (
+   sub: Submission,
+   record: StepRecord,
+   patchVars?: Record<string, unknown>
+): Submission => {
+   const old = sub.steps.find((s) => s.id === record.id);
+   const nextSteps = old
+      ? sub.steps.map((s) => (s.id === record.id ? record : s))
+      : [...sub.steps, record];
+
+   let next = sub;
+   next = applyPatchVars(next, patchVars);
+   next = { ...next, steps: nextSteps };
+
+   return next;
+};
 
 
 
 /* ---------- XState machine ---------- */
-export type ChecklistEvent = ApplyEvt | CompleteEvt | JumpEvt | BackEvt | AbortEvt;
-export type ChecklistContext = {
-   pipeline: StepId[];
-   idx: number;
-   submission: Submission;
-};
-type ChecklistInput = {
-  pipeline: StepId[];               // order used by the run (your STEP_ORDER/plan)
-  initialSubmission: Submission;     // initial submission object
-};
-
-
 export const checklistMachine = setup({
    types: {
       context: {} as ChecklistContext,
@@ -127,28 +219,66 @@ export const checklistMachine = setup({
       input: {} as ChecklistInput,
    },
    guards: {
-      isSummaryEvent: (_ctx, evt) => (evt as CompleteEvt).record?.id === ('summary' as StepId),
+      //isSummaryEvent: (_ctx, evt) => (evt as CompleteEvt).record?.id === ('summary' as StepId),
+      shouldAdvance: ({ event }) => event.type === "UPSERT" && !!event.advance,
+      shouldBuildReport: ({ context, event }) => 
+         event.type === "UPSERT" &&
+         !!event.advance &&
+         event.record.id === context.summaryStepId,
    },
    actions: {
+      /*
       applyAction: assign(({ context, event }) => {
          const e = event as ApplyEvt | CompleteEvt;
          return {
             submission: upsertSubmission(context.submission, e.record, e.patchVars),
          };
       }),
+      upsertAction: assign(({ context, event }) => {
+         const e = event as UpsertEvt;
+         return {
+            submission: upsertSubmission(context.submission, e.record, e.patchVars),
+         };
+      }),
+      */
+      upsertAction: assign(({ context, event }) => {
+         if (event.type !== "UPSERT") return {};
+         return {
+            submission: upsertSubmission(context.submission, event.record, event.patchVars),
+         };
+      }),
+      /*
       buildReportAction: assign(({ context }) => {
          const built = buildReport(context.submission);
          return { submission: built };
+      }),
+      */
+      /*
+      buildReportAction: assign(({ context }, _p, meta) => {
+         const builder = meta.input.buildReport ?? defaultBuildReport;
+         return { submission: builder(context.submission) };
+      }),
+      */
+      buildReportAction: assign(({ context }) => {
+         return { submission: context.buildReport(context.submission) };
       }),
       nextAction: assign(({ context }) => {
          const to = Math.min(context.idx + 1, context.pipeline.length - 1);
          return { idx: to };
       }),
+      /*
       jumpAction: assign(({ context, event }) => {
          const id = (event as JumpEvt).to;
          const to = context.pipeline.indexOf(id);
          return to >= 0 ? { idx: to } : {};
       }),
+      */
+      jumpAction: assign(({ context, event }) => {
+         if (event.type !== "JUMP") return {};
+         const to = context.pipeline.indexOf(event.to);
+         return to >= 0 ? { idx: to } : {};
+      }),
+      /*
       backToAction: assign(({ context, event }) => {
          const id = (event as BackEvt).to;
          const to = context.pipeline.indexOf(id);
@@ -172,19 +302,33 @@ export const checklistMachine = setup({
             idx: sumIdx >= 0 ? sumIdx : context.idx,
          };
       }),
+      */
+      backToAction: assign(({ context, event }) => {
+         if (event.type !== "BACK_TO") return {};
+         const to = context.pipeline.indexOf(event.to);
+         return to >= 0 ? { idx: to } : {};
+      }),
+      abortToSummaryAction: assign(({ context, event }) => {
+         if (event.type !== "ABORT") return {};
+         const sumIdx = context.pipeline.indexOf(context.summaryStepId);
+         return { idx: sumIdx >= 0 ? sumIdx : context.idx };
+      }),
    },
 }).createMachine({
    /** @xstate-layout N4IgpgJg5mDOIC5QGMAWZkGsA2BLWALgHSFgAOAxAIIAKNAMgJoDaADALqKhkD2suBXDwB2XEAA9EAJgCcAViIAWOQGYAjFLkAaEAE9EANk1EjcgL5mdaDDnzFSlAMIB5ALIMAogBUPbTkhBefkERMUkEAFoVVgMTeXVNHX0EFUU1IgB2AzlTCyt0LDxCEgJyChd3em9fNX9uPgEhUQDwtW09REUADnSVORkVDPNLEGtCuxKygCkAVXc-MSDG0JbpGViumS7FQfbkzS6lGM080YLbYocKACEqRwBpAH0vZwWApZDm0HDZViI+tqmJKINRGJSqDTDfI2Ir2UqUKjXZwAJS8b3qwSaYWkBnScgyrASe0MsWGI2EPAgcDEYwuBEWDU+2MifUUcQhiQ6kSkalOtNhkzIDMxK2+iGiGUyih5XSGwIQGSkpIyPROFjMQA */   
    id: 'checklist',
+   initial: 'step',
    context: ({ input }) => ({
       pipeline: input.pipeline,
       idx: 0,
       submission: input.initialSubmission,
+      summaryStepId: input.summaryStepId ?? ("summary" as StepId),
+      buildReport: input.buildReport ?? defaultBuildReport,
    }),
-   initial: 'step',
    states: {
       step: {
          on: {
+            /*
             APPLY: { actions: 'applyAction' },
             COMPLETE: [
                {
@@ -194,9 +338,25 @@ export const checklistMachine = setup({
                },
                { actions: ['applyAction', 'nextAction'] },
             ],
-            JUMP: { actions: 'jumpAction' },
-            BACK_TO: { actions: 'backToAction' },
-            ABORT: { actions: 'abortToSummaryAction' },
+            */
+            UPSERT: [
+               {
+                  guard: "shouldBuildReport",
+                  actions: [
+                     { type: "upsertAction" },
+                     { type: "buildReportAction" },
+                     { type: "nextAction" },
+                  ],
+               },
+               {
+                  guard: "shouldAdvance",
+                  actions: [{ type: "upsertAction" }, { type: "nextAction" }],
+               },
+               { actions: [{ type: "upsertAction" }] },
+            ],
+            JUMP: { actions: [{ type: "jumpAction" }] },
+            BACK_TO: { actions: [{ type: "backToAction" }] },
+            ABORT: { actions: [{ type: "abortToSummaryAction" }] },
          },
       },
    },

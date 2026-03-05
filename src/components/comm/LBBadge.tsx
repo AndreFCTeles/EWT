@@ -9,7 +9,7 @@ const LBBadge: React.FC = () => {//<Props> = ({ portName }) => {
    //const { status, health, online } = useLoadBankLive(portName);
    const lb = useLoadBankRuntime();
 
-   if (lb.phase === "probing") {
+   if (lb.phase === "searching") {
       return <Badge variant="light" color="yellow">A procurar banca…</Badge>;
    }
 

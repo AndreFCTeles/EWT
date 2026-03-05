@@ -4,8 +4,12 @@
 import React, {
    useState,
    useEffect,
-   useCallback
+   useCallback, 
+   useMemo 
 } from 'react';
+import { 
+   useDisclosure 
+} from '@mantine/hooks';
 import { 
    AppShell,
    Button,
@@ -22,7 +26,6 @@ import {
    Drawer,
    //Stepper
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { 
    IconSettings, 
    IconSun, 
@@ -33,11 +36,12 @@ import {
 import dayjs from '@/lib/dayjs-setup';
 import { APP_NAME } from '@/lib/config';
 // Components
-import LoginModal from '@/components/login/LoginModal';
-import login from '@/components/login/auth';
 import { ChecklistController } from '@checklist/ChecklistController';
+import CalibrationViewer from '@/components/toolcal/CalibrationViewer';
 import { AdminHUD } from '@/components/admin/AdminHUD';
+import LoginModal from '@/components/login/LoginModal';
 import Clock from '@/components/clock/Clock';
+import login from '@/components/login/auth';
 // Types
 import { 
    Role,
@@ -46,10 +50,14 @@ import {
    LS_KEEP,
    UIVIEW
 } from '@/types/generalTypes';
-import { Submission } from '@/types/checklistTypes';
-import { getInitialSubmission } from './dev/bootstrap';
-import CalibrationViewer from './components/toolcal/CalibrationViewer';
-import { initLoadBankMonitoring } from './services/hw/loadBankRuntimeStore';
+import { 
+   Submission, 
+   ChecklistId, 
+   DEFAULT_CHECKLIST 
+} from '@/types/checklistTypes';
+// Global functionality
+import { initLoadBankMonitoring } from '@/services/hw/loadBankRuntimeStore';
+import { getInitialSubmission } from '@/dev/bootstrap';
 
 
 
@@ -73,6 +81,11 @@ const App: React.FC  = () => {
       });
    // Component management & nav
    const [submission, setSubmission] = useState<Submission>(() => getInitialSubmission());
+   // NEW: choose checklist
+   const checklistId: ChecklistId = useMemo(() => {
+      // If you later want pickProcedure to drive this, keep it mapped here.
+      return (submission.vars?.mode as ChecklistId) ?? DEFAULT_CHECKLIST;
+   }, [submission.vars?.mode]);
    // UI/UX Basics
    const [navOpened, { toggle: toggleNav, close: closeNav }] = useDisclosure(false);
    const isAdmin = role === 'admin' || role === 'superadmin';
@@ -257,6 +270,7 @@ const App: React.FC  = () => {
                role={role}
                submission={submission}
                setSubmission={setSubmission}
+               checklistId={checklistId} // NEW
                />
             </Container>
 

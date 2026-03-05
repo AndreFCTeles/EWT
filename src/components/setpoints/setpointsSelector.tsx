@@ -46,13 +46,13 @@ const SetpointButton: React.FC<SetpointButtonProps> = ( {
          miw={"20%"}
          color={showInfo?"rgba(47, 158, 68, 0.5) ":"rgba(47, 158, 68, 1)"}
          variant={"filled"}
-         className={"POWERBTN"}
+         className={"CALBTN"}
          onClick={() => setShowInfo(v => !v)}>
             <IconInfoSmall stroke={1.5} width={"100%"} height={"100%"} color={"white"} />
          </Button>
 
          <Button
-         className="POWERBTN" 
+         className="CALBTN" 
          color={"green"}
          maw={"80%"}
          miw={"80%"} 
@@ -128,7 +128,7 @@ const SetpointButton: React.FC<SetpointButtonProps> = ( {
                      lh="100%" 
                      fw={600}
                      c={"green"}
-                     className="POWER" >
+                     className="CAL" >
                         {ampsText}
                      </Text>
                      <Text>{setpointLine}</Text>

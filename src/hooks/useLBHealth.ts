@@ -42,9 +42,12 @@ export default function useLoadBankLive(portName: string | null): LoadBankLive {
    }, [portName, status, health]);
 }*/
 
-import { useLoadBankRuntime } from "./useLoadBankRuntime";
+import { useMemo } from "react";
+import type { LoadBankLive } from "@/types/loadBankTypes";
+import { useLoadBankRuntime } from "@/hooks/useLoadBankRuntime";
 
 /** Convenience wrapper around the runtime store state */
+/*
 export function useLBHealth(cfg?: { autoStart?: boolean }) {
    const rt = useLoadBankRuntime({ autoStart: cfg?.autoStart });
 
@@ -64,4 +67,19 @@ export function useLBHealth(cfg?: { autoStart?: boolean }) {
       ensureLoadBankConnected: rt.ensureLoadBankConnected,
       stopLoadBankAutoDetect: rt.stopLoadBankAutoDetect,
    };
+}
+*/
+
+export default function useLoadBankLive(): LoadBankLive {
+   const s = useLoadBankRuntime();
+
+   return useMemo(() => {
+      const online = s.health?.online ?? false;
+      return {
+         portName: s.portName,
+         status: s.status,
+         health: s.health,
+         online,
+      };
+   }, [s.portName, s.status, s.health]);
 }

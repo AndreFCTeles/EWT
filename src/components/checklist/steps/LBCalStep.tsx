@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
-import { Button, NumberInput, Title, Text, Badge, SimpleGrid, Flex, ScrollArea, Box } from "@mantine/core";
+import React, { useEffect, useState, useMemo } from "react"; // useRef, 
+import { Button, NumberInput, Title, Badge, SimpleGrid, Flex, ScrollArea, Box } from "@mantine/core"; // Text,
 import { notifications } from "@mantine/notifications";
-import { IconBolt } from "@tabler/icons-react";//, IconInfoSmall
+//import { IconBolt } from "@tabler/icons-react";//, IconInfoSmall
 
 import type { StepRuntimeProps } from '@checklist/pipeline';
 import { StepShell } from '@checklist/StepShell';
@@ -14,15 +14,22 @@ import {
 import SetpointButton from "@/components/setpoints/setpointsSelector";
 
 import { applyLoadBankMaskSequence, setLoadBankContactors } from "@/services/hw/hardware";
-import { startLoadBankPolling } from "@/services/hw/lbProtocol";
+import { initLoadBankMonitoring } from "@/services/hw/loadBankRuntimeStore";
+//import { startLoadBankPolling } from "@/services/hw/lbProtocol";
+import { useLoadBankRuntime } from "@/hooks/useLoadBankRuntime";
 import { nowIso } from "@utils/generalUtils";
 
+import type { 
+   //LoadBankProbe, 
+   LoadBankStatus 
+} from "@/types/loadBankTypes";
 import type { Dut, Process, Verdict } from "@/types/checklistTypes"; 
-import type { LoadBankProbe, LoadBankStatus } from "@/types/loadBankTypes";
 import type { SetpointConfig } from "@/types/calibrationTypes";
-import { DEV_ECHO_BAUD, DEV_ECHO_COUNT } from "@/dev/devConfig";
 
-
+import { 
+   //DEV_ECHO_BAUD, 
+   DEV_ECHO_COUNT 
+} from "@/dev/devConfig";
 import DevEchoPcbTest from "@/dev/DevEchoPcbTest";
 
 
@@ -63,18 +70,26 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
    const minPowerA = vars.minPowerA as number | undefined;     
    const powerA = vars.powerA as number | undefined;     // from PickPowerStep
    const maxRated = powerA ?? dut?.ratedCurrent ?? null;    // fallback
-   const loadBank = vars.loadBank as LoadBankProbe | undefined;
+   //const loadBank = vars.loadBank as LoadBankProbe | undefined;
 
-   const hasLoadBank = !!(loadBank && loadBank.connected);
-   const portName = loadBank?.connected ? loadBank?.portName ?? "" : "";
+   //const portName = loadBank?.connected ? loadBank?.portName ?? "" : "";
+   //const hasLoadBank = !!(loadBank && loadBank.connected);
+   
+   // Backend-owned runtime state (hotplug/autodetect)
+   const rt = useLoadBankRuntime();
+   const online = rt.health?.online ?? false;
+   const portName = rt.portName ?? "";
+   const hasLoadBank = Boolean(online && portName);
 
    // ────────────────────────────────────────────────────────────────────────────
    // State
    // ────────────────────────────────────────────────────────────────────────────
-   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(
-      loadBank?.connected ? loadBank?.status ?? null : null
-   );
-   const [hasLiveStatus, setHasLiveStatus] = useState(false);
+   //const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(
+   //   loadBank?.connected ? loadBank?.status ?? null : null
+   //);
+   //const [hasLiveStatus, setHasLiveStatus] = useState(false);
+   const [bankStatus, setBankStatus] = useState<LoadBankStatus | null>(rt.status ?? null);
+   const hasLiveStatus = Boolean(rt.status);
    const [minSetpoint, setMinSetpoint] = useState<number | undefined | null>(minPowerA);
    const [setpoints, setSetpoints] = useState<SetpointConfig[]>([]);
    const [optionIndices, setOptionIndices] = useState<Record<number, number>>({});
@@ -82,13 +97,25 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
    const [pendingSetpointId, setPendingSetpointId] = useState<number | null>(null);
    const [busy, setBusy] = useState(false);
 
-   const [POWER, setPOWER] = useState(false);
-   const togglePOWER = () => setPOWER(!POWER);
+   //const [POWER, setPOWER] = useState(false);
+   //const togglePOWER = () => setPOWER(!POWER);
 
 
    // keep a stable stop() so StrictMode / remounts don’t start twice
-   const stopPollingRef = useRef<null | (() => Promise<void>)>(null);
+   //const stopPollingRef = useRef<null | (() => Promise<void>)>(null);
 
+   // Ensure backend monitoring is running when this step is active.
+   useEffect(() => {
+      if (!isActive) return;
+      void initLoadBankMonitoring();
+   }, [isActive]);
+
+   // Keep local bankStatus in sync with runtime status (source of truth)
+   useEffect(() => {
+      if (!rt.status) return;
+      setBankStatus(rt.status);
+      updateDutyCycleFromMask(rt.status.contactorsMask ?? 0);
+   }, [rt.status]);
    // ────────────────────────────────────────────────────────────────────────────
    // Derived
    // ────────────────────────────────────────────────────────────────────────────
@@ -130,6 +157,7 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
 
 
    // Start polling when component mounts
+   /*
    useEffect(() => {
       if (!hasLoadBank || !portName) return;
 
@@ -172,6 +200,44 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
          }
       };
    }, [hasLoadBank, portName]);
+   */
+   // Start/attach to runtime polling when the step becomes active.
+   // We don't require portName here: runtime is responsible for autodetect/hotplug.
+   /*
+   useEffect(() => {
+   if (!isActive) return;
+
+   const controller = new AbortController();
+   let stop: null | (() => Promise<void>) = null;
+   let cancelled = false;
+
+   (async () => {
+      // IMPORTANT: pass `null` (or "") to mean "autodetect runtime"
+      stop = await startLoadBankPolling(
+         null,
+         (s) => {
+         // s.portName is the real active port
+         setHasLiveStatus(true);
+         setBankStatus(s);
+         updateDutyCycleFromMask(s.contactorsMask ?? 0);
+         },
+         DEV_ECHO_BAUD,
+         controller.signal,
+         // optional health cb if you want to show online/offline
+         undefined
+      );
+
+      if (cancelled && stop) await stop();
+   })().catch((err) => console.error("[LBCalStep] polling attach error:", err));
+
+   return () => {
+      cancelled = true;
+      controller.abort();
+      // Only detach this subscriber. Ensure lbProtocol's stop() does NOT kill the global runtime
+      if (stop) void stop().catch(() => {});
+   };
+   }, [isActive]);
+   */
 
    // ────────────────────────────────────────────────────────────────────────────
    // Generate setpoints (static list). Actual combo will be re-resolved on click.
@@ -386,8 +452,13 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
 
    // Badge
    const statusBadge = hasLoadBank && bankStatus ? (
+      /*
       <Badge color="green" variant="light">
          Banca {loadBank!.bank_power}A #{loadBank!.bank_no} · {portName}
+      </Badge>
+      */
+      <Badge color="green" variant="light">
+         Banca {bankStatus.bankPower}A #{bankStatus.bankNo} · {portName}
       </Badge>
    ) : (
       <Badge color="red" variant="light">
@@ -436,7 +507,7 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
       <Button 
       size="xl"
       onClick={() => handleFinish("pass")}
-      >Concluir calibração</Button>
+      >Concluir</Button>
    )
 
 
@@ -467,6 +538,7 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
          >
 
             {/* Min, POWER */}
+            {/*
             <SimpleGrid 
             w={"100%"} 
             p={0}
@@ -517,9 +589,10 @@ const LBCalStep: React.FC<StepRuntimeProps> = ( {
                         <Text className="POWERLABEL">{POWER?"SUSPENDER":"APLICAR CARGA"}</Text>
                         <IconBolt size={100} />
                      </Flex>
-                  </Button> {/* usar IconFlame when cooldown */}
+                  </Button> // usar IconFlame when cooldown 
                </Flex>
             </SimpleGrid>
+            */}
 
 
             {/* Setpoint Selectors */}

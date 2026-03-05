@@ -1,6 +1,6 @@
 import { DEV_ECHO_COUNT, DEV_ECHO_REL_ERROR } from "@/dev/devConfig";
 import { LB_BRANCHES, RDP4000 } from "@/types/calibrationTypes";
-import { roundTo5 } from "./generalUtils";
+//import { roundTo5 } from "./generalUtils";
 import type { Process } from "@/types/checklistTypes";
 import type { 
    LoadBankBranch, 
@@ -9,6 +9,7 @@ import type {
    ComboCandidate, 
    ResistorSpec
 } from "@/types/calibrationTypes";
+import { roundToNthDecimal } from "./generalUtils";
 
 
 
@@ -133,10 +134,12 @@ export function generateSetpointsForProcess(
    // MIGConv: ignore min, use 25/50/75/100% of max
    if (process === "MIGConv") { /* ------------------------------------------------------ */ dbg("Process: ", process)
       const fractions = [0.25, 0.5, 0.75, 1.0].slice(0, count); /* ---------------------- */ dbg("fractions: ", fractions);
-      const rounded = fractions.map((f) => roundTo5(Math.max(5, maxCurrent * f))); /* --- */ dbg("rounded setpoints: ", rounded);
+    //const rounded = fractions.map((f) => roundTo5(Math.max(5, maxCurrent * f))); /* --- */ dbg("rounded setpoints: ", rounded);
+      const rounded = fractions.map((f) => Math.round(Math.max(5, maxCurrent * f))); /* - */ dbg("rounded setpoints: ", rounded);
       let uniq = Array.from(new Set(rounded)).sort((a, b) => a - b); /* ----------------- */ dbg("Unique setpoints: ", uniq);
 
-      const roundedMax = roundTo5(maxCurrent);
+      //const roundedMax = roundTo5(maxCurrent);
+      const roundedMax = Math.round(maxCurrent);
       if (!uniq.includes(roundedMax)) uniq.push(roundedMax);
       if (uniq.length > count) { uniq = uniq.slice(uniq.length - count); } 
 
@@ -159,16 +162,19 @@ export function generateSetpointsForProcess(
          ? minCurrent
          : fallbackMin; /* -------------------------------------------------------------- */ dbg("minForUse:", minForUse);
 
-   if (count === 1) { return [roundTo5(maxCurrent)]; }
+   //if (count === 1) { return [roundTo5(maxCurrent)]; }
+   if (count === 1) { return [Math.round(maxCurrent)]; }
 
    const step = (maxCurrent - minForUse) / (count - 1);
-   const points = Array.from({ length: count }, (_, i) => roundTo5(minForUse + i * step));   dbg("calculated setpoints:", points);
+   //const points = Array.from({ length: count }, (_, i) => roundTo5(minForUse + i * step));   dbg("calculated setpoints:", points);
+   const points = Array.from({ length: count }, (_, i) => Math.round(minForUse + i * step));   dbg("calculated setpoints:", points);
 
    // Ensure monotonic and within [0, maxCurrent] after rounding
    let uniq = Array.from(new Set(points)).sort((a, b) => a - b); /* --------------------- */ dbg("Unique setpoints: ", uniq);
 
    // Guarantee the last point is exactly rounded maxCurrent
-   const roundedMax = roundTo5(maxCurrent);
+   //const roundedMax = roundTo5(maxCurrent);
+   const roundedMax = Math.round(maxCurrent);
    if (!uniq.includes(roundedMax)) {
       if (uniq.length >= count) uniq[uniq.length - 1] = roundedMax;
       else uniq.push(roundedMax);
@@ -236,16 +242,17 @@ export function resolveLoadBankSetpoint(
          ? "impossível"
          : combo.maxOnMs === Infinity
          ? "contínuo"
-         : `${Math.round(combo.maxOnMs / 1000)}s`;
+         //: `${Math.round(combo.maxOnMs / 1000)}s`;
+         : `${roundToNthDecimal(combo.maxOnMs, 4)}s`;
 
    const errorLabel = [
       `I ≈ ${combo.approxCurrentA.toFixed(0)}A`,
-      `Ierr = ${iErrPct.toFixed(1)}%`,
-      `Req ≈ ${combo.reqOhm.toFixed(4)}Ω`,
-      `Rerr = ${rErrPct.toFixed(1)}%`,
+      `Ierr = ${roundToNthDecimal(iErrPct, 1)}%`,
+      `Req ≈ ${roundToNthDecimal(combo.reqOhm, 4)}Ω`,
+      `Rerr = ${roundToNthDecimal(rErrPct, 1)}%`,
       `tOn = ${maxOn}`,
-      `usedMax = ${Math.round(combo.usedOnMsMax / 1000)}s/${Math.round(combo.cycleMs / 1000)}s`,
-      `${combo.u2V} V`,
+      `usedMax = ${roundToNthDecimal(combo.usedOnMsMax, 4)}s/${roundToNthDecimal(combo.cycleMs, 4)}s`,
+      `${roundToNthDecimal(combo.u2V, 2)} V`,
    ];//.join(" · ");
 
    const options: ContactorOption[] = [
