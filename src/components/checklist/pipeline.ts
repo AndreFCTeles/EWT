@@ -1,8 +1,9 @@
 import { setup, assign } from 'xstate';
 
-import { buildReport as defaultBuildReport } from '@utils/report';
+//import { buildReport as defaultBuildReport } from '@utils/report';
 import type { StepId, Submission, StepRecord } from '@/types/checklistTypes';
 import type { Role } from '@/types/generalTypes';
+import { nowIso } from '@/services/utils/generalUtils';
 
 //import { nowIso } from '@/services/utils/generalUtils';
 
@@ -21,8 +22,8 @@ export type StepRuntimeProps = {
    // TODO?: remover isto? Q: é possível simplesmente deixar XState cuidar disto?
    alreadyCompleted: boolean;                   // StepRecord já em submission.steps
 
-   goBack: () => void;
    canGoBack: boolean;
+   goBack: () => void;
    
    apply: ( 
       record: StepRecord,
@@ -41,50 +42,19 @@ export type StepRuntimeProps = {
 
 
 
-/*
-type ApplyEvt = { 
-   type: 'APPLY'; 
-   record: StepRecord; 
-   patchVars?: Record<string, unknown> 
-};
-type CompleteEvt = { 
-   type: 'COMPLETE'; 
-   record: StepRecord; 
-   patchVars?: Record<string, unknown> 
-};
-*/
-
-type UpsertEvt = {
-   type: "UPSERT";
-   record: StepRecord;
-   patchVars?: Record<string, unknown>;
-   advance?: boolean;
-};
-type JumpEvt = { type: 'JUMP'; to: StepId };
-type BackEvt = { type: 'BACK_TO'; to: StepId }; 
-type AbortEvt = { type: 'ABORT'; reason: string };
-
-export type ChecklistEvent = UpsertEvt | JumpEvt | BackEvt | AbortEvt; // ApplyEvt | CompleteEvt
-export type ChecklistContext = {
-   pipeline: StepId[];
-   idx: number;
-   submission: Submission;
-   summaryStepId: StepId;
-   buildReport: (s: Submission) => Submission;
-};
-export type ChecklistInput = {
-   pipeline: StepId[];                  // order used by the run (your STEP_ORDER/plan)
-   initialSubmission: Submission;       // initial submission object
-   buildReport?: (s: Submission) => Submission;
-   summaryStepId?: StepId;             // default "summary"
-};
 
 
 
 
-/* ---------- Submission Helpers (pure/immutable) ---------- */
+
+
+// -----------------------------------------------------------------------------
+// Submission Helpers (pure/immutable)
+// -----------------------------------------------------------------------------
+
 export const wasCompleted = (sub: Submission, id: StepId) => sub.steps.some((s) => s.id === id);
 
+/*
 const ROOT_KEYS = new Set<string>([
    "dut",
    "header",
@@ -96,6 +66,7 @@ const ROOT_KEYS = new Set<string>([
    "reportId",
    "steps",
 ]);
+*/
 
 /*
 const shallowEqualKeys = (
@@ -122,6 +93,7 @@ const deepMerge = (base: unknown, patch: unknown): unknown => {
    return out;
 };
 
+/*
 const setIn = (obj: any, path: string[], value: unknown): any => {
    if (!path.length) return value;
    const [head, ...rest] = path;
@@ -167,6 +139,73 @@ const applyPatchVars = (sub: Submission, patchVars?: Record<string, unknown>) =>
 
    return next;
 };
+*/
+
+function setDotPath(obj: any, dot: string, value: unknown): any {
+   const parts = dot.split(".").filter(Boolean);
+   if (parts.length === 0) return obj;
+
+   const out = Array.isArray(obj) ? [...obj] : { ...(obj ?? {}) };
+   let cur = out;
+
+   for (let i = 0; i < parts.length - 1; i++) {
+      const k = parts[i];
+      const next = cur[k];
+      cur[k] = Array.isArray(next) ? [...next] : { ...(next ?? {}) };
+      cur = cur[k];
+   }
+
+   cur[parts[parts.length - 1]] = value;
+   return out;
+}
+
+/**
+ * Patch semantics (kept deliberately simple):
+ *
+ * - If patch has any of {root, vars, tfl}, treat it as a structured patch.
+ * - Otherwise, treat patch as vars patch, BUT allow dot-path keys to patch root
+ *   (e.g. {"instruments.lbId": "600A-1"}).
+ */
+function applyPatch(sub: Submission, patch?: Record<string, any>): Submission {
+   if (!patch || !isPlainObject(patch)) return sub;
+
+   const hasStructured = "root" in patch || "vars" in patch || "tfl" in patch;
+
+   if (hasStructured) {
+      const root = (patch as any).root as Partial<Submission> | undefined;
+      const vars = (patch as any).vars as Record<string, any> | undefined;
+      const tfl = (patch as any).tfl as Submission["tfl"] | undefined;
+
+      return {
+         ...sub,
+         ...(root ?? {}),
+         vars: { ...(sub.vars ?? {}), ...(vars ?? {}) },
+         tfl: tfl ? ({ ...(sub.tfl ?? ({} as any)), ...tfl } as any) : sub.tfl,
+      };
+   }
+
+   // legacy patch: vars merge + dot-path root patch
+   const flat = patch as Record<string, any>;
+   const varsPatch: Record<string, any> = {};
+   const dotKeys: string[] = [];
+
+   for (const k of Object.keys(flat)) {
+      if (k.includes(".")) dotKeys.push(k);
+      else varsPatch[k] = flat[k];
+   }
+
+   let next: Submission = {
+      ...sub,
+      vars: { ...(sub.vars ?? {}), ...varsPatch },
+   };
+
+   for (const dk of dotKeys) {
+      next = setDotPath(next, dk, flat[dk]);
+   }
+
+   return next;
+}
+
 
 /*
 const upsertSubmission = (
@@ -198,20 +237,79 @@ const upsertSubmission = (
    patchVars?: Record<string, unknown>
 ): Submission => {
    const old = sub.steps.find((s) => s.id === record.id);
-   const nextSteps = old
+   const steps = old
       ? sub.steps.map((s) => (s.id === record.id ? record : s))
       : [...sub.steps, record];
 
+   /*
    let next = sub;
    next = applyPatchVars(next, patchVars);
    next = { ...next, steps: nextSteps };
 
    return next;
+   */
+
+   const patched = applyPatch(sub, patchVars);
+   return { ...patched, steps };
 };
 
 
 
-/* ---------- XState machine ---------- */
+// -----------------------------------------------------------------------------
+// XState machine
+// -----------------------------------------------------------------------------
+
+/*
+type ApplyEvt = { 
+   type: 'APPLY'; 
+   record: StepRecord; 
+   patchVars?: Record<string, unknown> 
+};
+type CompleteEvt = { 
+   type: 'COMPLETE'; 
+   record: StepRecord; 
+   patchVars?: Record<string, unknown> 
+};
+*/
+
+type UpsertEvt = {
+   type: "UPSERT";
+   record: StepRecord;
+   patchVars?: Record<string, unknown>;
+   advance?: boolean;
+};
+type SetPipelineEvt = {
+   type: "SET_PIPELINE";
+   pipeline: StepId[];
+};
+type JumpEvt = { type: 'JUMP'; to: StepId };
+type BackEvt = { type: 'BACK_TO'; to: StepId }; 
+type AbortEvt = { type: 'ABORT'; reason: string };
+
+export type ChecklistEvent = UpsertEvt | SetPipelineEvt | JumpEvt | BackEvt | AbortEvt; // ApplyEvt | CompleteEvt
+/*export type ChecklistContext = {
+   pipeline: StepId[];
+   idx: number;
+   submission: Submission;
+   summaryStepId: StepId;
+   buildReport: (s: Submission) => Submission;
+};*/
+export type ChecklistContext = {
+   pipeline: StepId[];
+   idx: number;
+   submission: Submission;
+};
+/*export type ChecklistInput = {
+   pipeline: StepId[];                  // order used by the run (your STEP_ORDER/plan)
+   initialSubmission: Submission;       // initial submission object
+   buildReport?: (s: Submission) => Submission;
+   summaryStepId?: StepId;             // default "summary"
+};*/
+export type ChecklistInput = {
+   pipeline: StepId[];
+   initialSubmission: Submission;
+};
+
 export const checklistMachine = setup({
    types: {
       context: {} as ChecklistContext,
@@ -221,10 +319,12 @@ export const checklistMachine = setup({
    guards: {
       //isSummaryEvent: (_ctx, evt) => (evt as CompleteEvt).record?.id === ('summary' as StepId),
       shouldAdvance: ({ event }) => event.type === "UPSERT" && !!event.advance,
+      /*
       shouldBuildReport: ({ context, event }) => 
          event.type === "UPSERT" &&
          !!event.advance &&
          event.record.id === context.summaryStepId,
+      */
    },
    actions: {
       /*
@@ -258,13 +358,30 @@ export const checklistMachine = setup({
          const builder = meta.input.buildReport ?? defaultBuildReport;
          return { submission: builder(context.submission) };
       }),
-      */
       buildReportAction: assign(({ context }) => {
          return { submission: context.buildReport(context.submission) };
       }),
+      */
+
       nextAction: assign(({ context }) => {
          const to = Math.min(context.idx + 1, context.pipeline.length - 1);
          return { idx: to };
+      }),
+
+      setPipelineAction: assign(({ context, event }) => {
+         if (event.type !== "SET_PIPELINE") return {};
+
+         const oldActive = context.pipeline[context.idx];
+         const newPipeline = event.pipeline;
+         const mappedIdx = oldActive ? newPipeline.indexOf(oldActive) : -1;
+
+         return {
+            pipeline: newPipeline,
+            idx:
+               mappedIdx >= 0
+                  ? mappedIdx
+                  : Math.max(0, Math.min(context.idx, newPipeline.length - 1)),
+         };
       }),
       /*
       jumpAction: assign(({ context, event }) => {
@@ -308,10 +425,29 @@ export const checklistMachine = setup({
          const to = context.pipeline.indexOf(event.to);
          return to >= 0 ? { idx: to } : {};
       }),
+      /*
       abortToSummaryAction: assign(({ context, event }) => {
          if (event.type !== "ABORT") return {};
          const sumIdx = context.pipeline.indexOf(context.summaryStepId);
          return { idx: sumIdx >= 0 ? sumIdx : context.idx };
+      }),
+      */
+
+      abortAction: assign(({ context, event }) => {
+         if (event.type !== "ABORT") return {};
+
+         // keep it simple: record a failure on the current step (if possible)
+         const id = context.pipeline[context.idx];
+         const now = nowIso();
+         const record: StepRecord = {
+            id,
+            startedAt: now,
+            endedAt: now,
+            verdict: "fail",
+            notes: [event.reason],
+         };
+
+         return { submission: upsertSubmission(context.submission, record) };
       }),
    },
 }).createMachine({
@@ -322,12 +458,13 @@ export const checklistMachine = setup({
       pipeline: input.pipeline,
       idx: 0,
       submission: input.initialSubmission,
-      summaryStepId: input.summaryStepId ?? ("summary" as StepId),
-      buildReport: input.buildReport ?? defaultBuildReport,
+      //summaryStepId: input.summaryStepId ?? ("summary" as StepId),
+      //buildReport: input.buildReport ?? defaultBuildReport,
    }),
    states: {
       step: {
          on: {
+         SET_PIPELINE: { actions: [{ type: "setPipelineAction" }] },
             /*
             APPLY: { actions: 'applyAction' },
             COMPLETE: [
@@ -341,22 +478,24 @@ export const checklistMachine = setup({
             */
             UPSERT: [
                {
-                  guard: "shouldBuildReport",
+                  guard: { type: "shouldAdvance" }, // "shouldBuildReport",
                   actions: [
                      { type: "upsertAction" },
-                     { type: "buildReportAction" },
+                     //{ type: "buildReportAction" },
                      { type: "nextAction" },
                   ],
                },
+               /*
                {
                   guard: "shouldAdvance",
                   actions: [{ type: "upsertAction" }, { type: "nextAction" }],
                },
+               */
                { actions: [{ type: "upsertAction" }] },
             ],
             JUMP: { actions: [{ type: "jumpAction" }] },
             BACK_TO: { actions: [{ type: "backToAction" }] },
-            ABORT: { actions: [{ type: "abortToSummaryAction" }] },
+            ABORT: { actions: [{ type: "abortAction" }] }, //[{ type: "abortToSummaryAction" }]
          },
       },
    },

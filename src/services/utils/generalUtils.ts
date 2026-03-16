@@ -24,7 +24,7 @@ export function serialToFormatDate(value: number | string | undefined) {
 
 // TODO:
 export const roundTo5 = (value: number): number => Math.round(value / 5) * 5; // remove this after
-// IMPLEMENT ROUND TO INT
+// IMPLEMENT ROUND TO INT - 06/03/2026: PARTIALLY DONE - falta conv
 
 export const maskHex = (mask?: number) => {
    if (mask == null) return "—";

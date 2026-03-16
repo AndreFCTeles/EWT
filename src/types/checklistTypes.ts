@@ -1,4 +1,10 @@
-import type { FuncData, ProdCategory, ProductData, TechnicalData } from "./productTypes";
+import type { 
+   FuncData, 
+   ProdCategory, 
+   ProductData, 
+   TechnicalData,
+   ImageData
+} from "./productTypes";
 import type { Tol } from "./generalTypes";
 
 
@@ -12,8 +18,8 @@ export const PROCESSES: Process[] = ['MMA', 'TIG', 'MIGInv', 'MIGConv'];
 export type RatedCurrent = 200|250|300|350|400|500|600|1000;
 export const POWERS: RatedCurrent[] = [200, 250, 300, 350, 400, 500, 600, 1000];
 
-export type DeviceOrigin = 'db'|'manual'|'autodetect';
-export type Unit = 'V'|'A'|'Ω'|'°C'|'mV'|'mA'|'kΩ'|'%';
+export type DeviceOrigin = 'db' | 'manual' | 'autodetect';
+export type Unit = 'V' | 'A' | 'Ω' | '°C' | 'mV' | 'mA' | 'kΩ' | '%';
 export type Polarity = 'ok' | 'reversed' | 'open' | 'unknown';
 
 export type Verdict = 
@@ -28,18 +34,11 @@ export type StepId = //
    'detectPowerBank'
    //| 'testLBStep' 
    | 'pickProcedure' 
-   // | 'specs' 
-   // | 'dutSearch'
    | 'pickProcess' 
    | 'pickPower' 
    | 'pickBrand'
-   // | 'dut' 
-   // | 'interlocks' 
-   // | 'connections' 
-   // | 'selftests' 
-   // | 'calstatus'
-   | 'calibration'
-   // | 'ocv'
+   | 'calibration'// VALCAL main step (load-bank driven)
+   | "tfl" // TFL runner (group-based, data-driven)
    | 'summary' 
    | 'export';
 
@@ -54,18 +53,10 @@ export const CHECKLISTS: Record<ChecklistId, StepId[]> = {
       'detectPowerBank', 
       //'testLBStep',
       'pickProcedure',
-      // 'specs', 
-      // 'dutSearch',
       'pickProcess',
       'pickPower',
       'pickBrand',
-      // 'dut', 
-      // 'interlocks', 
-      // 'connections', 
-      // 'selftests', 
-      // 'calstatus',
       'calibration', 
-      // 'ocv',
       'summary',
       'export'
    ],
@@ -73,18 +64,11 @@ export const CHECKLISTS: Record<ChecklistId, StepId[]> = {
       "detectPowerBank",
       //'testLBStep',
       "pickProcedure",
-      // "specs",
-      // 'dutSearch',
       "pickProcess",
       "pickPower",
       "pickBrand",
-      // 'dut', 
-      // 'interlocks', 
-      // 'connections', 
-      // 'selftests', 
-      // 'calstatus',
-      "calibration",
-      // "ocv",
+      "tfl",
+      'calibration', 
       "summary",
       "export",
    ]
@@ -128,37 +112,6 @@ export type ProductDoc = {
    updatedDate?: string;
 };
 
-/* old 
-export type ProductDoc = {
-   _id?: { $oid: string };
-   prodName: string;
-   brand: string;
-   series?: string;
-   serialno?: string;
-   category: {
-      main: string;
-      sub?: {
-         main: string;
-         format?: string;
-         sub?: { 
-            main: string 
-         };
-      };
-      format?: string;
-   };
-   technical: Array<{ 
-      field: string; 
-      value: string; 
-      suf?: string 
-   }>;
-   applications?: string;
-   description?: string;
-   functions: any[];
-   images: any[];
-   createdDate?: string;
-   updatedDate?: string;
-};
-*/
 
 
 export type Dut = {
@@ -173,6 +126,103 @@ export type Dut = {
 };
 
 
+
+// -----------------------------------------------------------------------------
+// TFL (group-based runner) schema
+// -----------------------------------------------------------------------------
+
+export type TflGroupVerdict = "pass" | "fail" | "warn";
+
+export type TflGroupResult = {
+   /** stable key (e.g. 'u2', 'cooling', 'final') */
+   key: string;
+   title: string;
+   verdict: TflGroupVerdict;
+   /** optional captured numeric value */
+   value?: number;
+   unit?: Unit;
+   notes?: string;
+};
+
+export type TflRun = {
+   /** e.g. 'L7.002' */
+   procedureId: string;
+   /** free text label shown to operator */
+   procedureTitle?: string;
+   /** optional model/family tag used to pick a default procedure */
+   productFamily?: string;
+   groups: TflGroupResult[];
+};
+
+
+export type ProcedureField = {
+   key: string;
+   label: string;
+   type: "number" | "text" | "select" | "boolean";
+   unit?: string;
+   required?: boolean;
+   options?: string[];
+};
+
+export type ProcedureCheck =
+   | {
+         kind: "instruction";
+         checkId: string;
+         label: string;
+         instructions: string[];
+      }
+   | {
+         kind: "valueForm";
+         checkId: string;
+         label: string;
+         instructions?: string[];
+         fields: ProcedureField[];
+         expected?: {
+         type: "range" | "tableLookup" | "note";
+         value: unknown;
+         };
+      };
+
+export type ProcedureSection = {
+   sectionId: string;
+   title: string;
+   opRange?: { from: number; to: number };
+   summaryKey: string;
+   when?: {
+      onlyModels?: string[];
+      exceptModels?: string[];
+      requiresCapabilities?: string[];
+      onlyProcesses?: string[];
+   };
+   checks: ProcedureCheck[];
+};
+
+export type TflProcedureTemplate = {
+   procedureId: string;
+   title: string;
+   checklist: "TFL";
+   doc?: {
+      code?: string;
+      title?: string;
+      revision?: string;
+   };
+   appliesTo: {
+      category?: string;
+      family?: string;
+      models?: string[];
+      processes?: string[];
+   };
+   capabilities?: string[];
+   sections: ProcedureSection[];
+};
+
+
+
+
+// -----------------------------------------------------------------------------
+// Submission (durable JSON)
+// -----------------------------------------------------------------------------
+
 export type Submission = {
    header: { 
       operator: string; 
@@ -180,18 +230,23 @@ export type Submission = {
       appVer: string; 
       templateVer: string; 
    };
+
    dut?: Dut;
+
    instruments: { 
       meterId: string; 
       meterCal: string; 
       lbId: string; 
       lbFw?: string; 
    };
+
    env?: { 
       ambientC?: number; 
       mainsV?: number 
    };
+
    steps: StepRecord[];
+
    vars?: {
       // workflow flags / selections
       mode?: ChecklistId;
@@ -207,10 +262,21 @@ export type Submission = {
       // runtime snapshots
       loadBank?: any;
 
+      // TFL helpers
+      tflProcedureId?: string;
+      tflProductFamily?: string;
+
       [k: string]: any;
    };
+
+   /** path-specific payloads */
+   tfl?: TflRun;
+
+   /** finalization */
    finalVerdict?: Verdict;
    reportId?: string;
    generatedAt?: string;
    version?: number;
 };
+
+
